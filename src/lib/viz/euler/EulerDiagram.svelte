@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts } from '$lib/stores';
+	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications } from '$lib/stores';
 	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
 	import Tooltip from '$lib/ui/Tooltip.svelte';
+	import DetailsPanel from './DetailsPanel.svelte';
 
 	/** Per-cluster visual opacity (0–1). Passed from page; defaults to fully opaque. */
 	export let clusterOpacities: Record<string, number> = {};
@@ -119,6 +120,8 @@
 	// ─── Hover / tooltip ─────────────────────────────────────────────────────
 	let tooltipX = 0;
 	let tooltipY = 0;
+	let panelX = 0;
+	let panelY = 0;
 
 	/** Primary discipline of the currently hovered publication (for dot highlight logic). */
 	$: hoveredDisc = $hoveredPublication?.disciplines[0] ?? null;
@@ -137,6 +140,13 @@
 
 	function handleDotLeave() {
 		setHovered(null);
+	}
+
+	function handleDotClick(node: EulerNode) {
+		// Record panel anchor at the dot's SVG coordinate
+		panelX = node.x;
+		panelY = node.y;
+		selectSingle(node.id);
 	}
 
 	function handleClusterEnter(region: RegionContour) {
@@ -166,6 +176,13 @@
 
 <div class="euler-container" bind:this={container}>
 	<Tooltip pub={$hoveredPublication} x={tooltipX} y={tooltipY} />
+	<DetailsPanel
+		pub={$selectedPublications[0] ?? null}
+		x={panelX}
+		y={panelY}
+		containerWidth={width}
+		containerHeight={height}
+	/>
 	<svg {width} {height} role="img" aria-label="Euler diagram of decision making publications">
 
 		<!-- Layer 1: Cluster region contours -->
@@ -224,6 +241,7 @@
 				style="cursor:pointer"
 				on:pointerenter={(e) => handleDotEnter(e, node)}
 				on:pointerleave={handleDotLeave}
+				on:click={() => handleDotClick(node)}
 			/>
 		{/each}
 
