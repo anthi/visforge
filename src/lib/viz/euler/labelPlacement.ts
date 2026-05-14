@@ -10,11 +10,8 @@ export type RawDiscLabel = {
 	anchorX: number;
 	anchorY: number;
 	color: string;
-	/** Centroid x of the parent cluster's nodes — used for soft containment. */
 	clusterCX: number;
-	/** Centroid y of the parent cluster's nodes. */
 	clusterCY: number;
-	/** 85th-percentile radius of the parent cluster's nodes from its centroid. */
 	clusterR: number;
 };
 
@@ -26,43 +23,151 @@ export type PlacedLabel = {
 	color: string;
 };
 
-// ─── Internal sim node type ───────────────────────────────────────────────────
+// ─── Internal ─────────────────────────────────────────────────────────────────
 
 type SimNode = SimulationNodeDatum &
-	RawDiscLabel & {
-		vx: number;
-		vy: number;
-	};
+	RawDiscLabel & { vx: number; vy: number };
 
-// ─── Geometry helpers ─────────────────────────────────────────────────────────
-
-// At 10px JetBrains Mono the average character is ~5.8px wide.
-const CHAR_W = 5.8;
+const CELL = 8;   // px per density-grid cell
+const CHAR_W = 5.8; // px per character at 10px JetBrains Mono
 
 function halfWidth(label: string): number {
 	return (label.length * CHAR_W) / 2;
 }
 
-// ─── Custom forces ────────────────────────────────────────────────────────────
+// ─── Phase 1: dot density grid ────────────────────────────────────────────────
+//
+// Each publication dot contributes a gaussian-like falloff to nearby cells.
+// Low grid value = whitespace; high value = dot-dense area.
 
-/** Pull each label toward its own discipline centroid (anchor). */
-function anchorForce(strength: number) {
+function buildDensityGrid(
+	dots: EulerNode[],
+	cols: number,
+	rows: number
+): Float32Array {
+	const grid = new Float32Array(cols * rows);
+	const R = 14; // influence radius in px
+	const SPAN = Math.ceil(R / CELL) + 1;
+
+	for (const d of dots) {
+		const gx = Math.floor(d.x / CELL);
+		const gy = Math.floor(d.y / CELL);
+		for (let cy = -SPAN; cy <= SPAN; cy++) {
+			for (let cx = -SPAN; cx <= SPAN; cx++) {
+				const nx = gx + cx, ny = gy + cy;
+				if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+				const dist = Math.sqrt((cx * CELL) ** 2 + (cy * CELL) ** 2);
+				if (dist <= R) grid[ny * cols + nx] += (R - dist) / R;
+			}
+		}
+	}
+	return grid;
+}
+
+// ─── Phase 2: nearest-whitespace search ───────────────────────────────────────
+//
+// For each label, scan candidate grid positions within the cluster radius and
+// pick the one with the lowest combined score (dot density + distance from anchor).
+// Constrained to stay within the cluster centroid radius.
+
+function findBestWhitespace(
+	anchorX: number,
+	anchorY: number,
+	clusterCX: number,
+	clusterCY: number,
+	clusterR: number,
+	grid: Float32Array,
+	cols: number,
+	rows: number
+): [number, number] {
+	let best: [number, number] = [anchorX, anchorY];
+	let bestScore = Infinity;
+
+	const STEP = 10; // px between candidate positions
+	const limit = Math.min(clusterR, 220);
+
+	for (let dy = -limit; dy <= limit; dy += STEP) {
+		for (let dx = -limit; dx <= limit; dx += STEP) {
+			if (dx * dx + dy * dy > limit * limit) continue;
+
+			const px = anchorX + dx;
+			const py = anchorY + dy;
+
+			// Must be within cluster radius from cluster centroid
+			const cdx = px - clusterCX;
+			const cdy = py - clusterCY;
+			if (cdx * cdx + cdy * cdy > clusterR * clusterR) continue;
+
+			const gx = Math.floor(px / CELL);
+			const gy = Math.floor(py / CELL);
+			if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
+
+			// Low density preferred; secondarily prefer positions closer to anchor
+			const density = grid[gy * cols + gx];
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			const score = density * 15 + dist * 0.08;
+
+			if (score < bestScore) {
+				bestScore = score;
+				best = [px, py];
+			}
+		}
+	}
+
+	return best;
+}
+
+// Mark the footprint of a placed label as occupied so the next greedy search
+// avoids it.
+
+function markOccupied(
+	x: number,
+	y: number,
+	labelHalfW: number,
+	grid: Float32Array,
+	cols: number,
+	rows: number
+): void {
+	const halfW = Math.ceil((labelHalfW + 12) / CELL);
+	const halfH = Math.ceil(8 / CELL) + 1;
+	const gx = Math.floor(x / CELL);
+	const gy = Math.floor(y / CELL);
+
+	for (let cy = -halfH; cy <= halfH; cy++) {
+		for (let cx = -halfW; cx <= halfW; cx++) {
+			const nx = gx + cx, ny = gy + cy;
+			if (nx >= 0 && ny >= 0 && nx < cols && ny < rows) {
+				grid[ny * cols + nx] += 800;
+			}
+		}
+	}
+}
+
+// ─── Phase 3: collision simulation ───────────────────────────────────────────
+//
+// Labels start at their whitespace-found positions. A light forceCollide sim
+// resolves any residual label–label overlaps, anchored back toward the whitespace
+// target so labels don't drift into dot clusters.
+
+function whitespaceAnchorForce(
+	targets: Map<string, [number, number]>,
+	strength: number
+) {
 	let nodes: SimNode[] = [];
 	const force = (alpha: number): void => {
 		for (const n of nodes) {
-			n.vx += (n.anchorX - (n.x ?? n.anchorX)) * alpha * strength;
-			n.vy += (n.anchorY - (n.y ?? n.anchorY)) * alpha * strength;
+			const t = targets.get(n.id);
+			if (!t) continue;
+			n.vx += (t[0] - (n.x ?? t[0])) * alpha * strength;
+			n.vy += (t[1] - (n.y ?? t[1])) * alpha * strength;
 		}
 	};
 	(force as typeof force & { initialize: (ns: SimNode[]) => void }).initialize = (
 		ns: SimNode[]
-	) => {
-		nodes = ns;
-	};
+	) => { nodes = ns; };
 	return force;
 }
 
-/** Push labels back inside their cluster radius if they drift outside. */
 function containmentForce(strength: number) {
 	let nodes: SimNode[] = [];
 	const force = (alpha: number): void => {
@@ -81,87 +186,70 @@ function containmentForce(strength: number) {
 	};
 	(force as typeof force & { initialize: (ns: SimNode[]) => void }).initialize = (
 		ns: SimNode[]
-	) => {
-		nodes = ns;
-	};
-	return force;
-}
-
-/** Repel each label away from nearby publication dots. */
-function dotRepelForce(dots: EulerNode[], repelR: number, strength: number) {
-	let nodes: SimNode[] = [];
-	const force = (alpha: number): void => {
-		for (const n of nodes) {
-			let fx = 0,
-				fy = 0;
-			const lx = n.x ?? n.anchorX;
-			const ly = n.y ?? n.anchorY;
-			for (const d of dots) {
-				const dx = lx - d.x;
-				const dy = ly - d.y;
-				const dist = Math.sqrt(dx * dx + dy * dy);
-				if (dist < repelR && dist > 0) {
-					const f = (strength * (1 - dist / repelR)) / dist;
-					fx += dx * f;
-					fy += dy * f;
-				}
-			}
-			n.vx += fx * alpha;
-			n.vy += fy * alpha;
-		}
-	};
-	(force as typeof force & { initialize: (ns: SimNode[]) => void }).initialize = (
-		ns: SimNode[]
-	) => {
-		nodes = ns;
-	};
+	) => { nodes = ns; };
 	return force;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Runs a static d3-force simulation (no animation) to place discipline labels
- * so they:
- *   - don't overlap each other
- *   - repel away from dense dot areas
- *   - stay within their parent cluster region
+ * Places discipline sub-labels in available whitespace.
  *
- * Starts each label at its discipline centroid with a tiny deterministic jitter.
+ * Three-phase algorithm:
+ *   1. Build a dot-density grid over the canvas.
+ *   2. For each label, greedy-search the grid for the nearest low-density
+ *      position within the cluster radius; mark it occupied before the next search.
+ *   3. Run a short forceCollide simulation (labels only, 150 ticks) anchored
+ *      toward the whitespace positions to resolve any residual overlap.
  */
 export function placeDiscLabels(
 	rawLabels: RawDiscLabel[],
-	allNodes: EulerNode[]
+	allNodes: EulerNode[],
+	canvasWidth: number,
+	canvasHeight: number
 ): PlacedLabel[] {
 	if (rawLabels.length === 0) return [];
 
-	// Deterministic jitter using golden-angle increments so labels don't start stacked
-	const simNodes: SimNode[] = rawLabels.map((spec, i) => ({
-		...spec,
-		x: spec.anchorX + Math.cos(i * 2.399) * 6,
-		y: spec.anchorY + Math.sin(i * 2.399) * 6,
-		vx: 0,
-		vy: 0
-	}));
+	const cols = Math.ceil(canvasWidth / CELL);
+	const rows = Math.ceil(canvasHeight / CELL);
+
+	// Phase 1
+	const grid = buildDensityGrid(allNodes, cols, rows);
+
+	// Phase 2: greedy sequential placement
+	const whitespaceTargets = new Map<string, [number, number]>();
+	for (const spec of rawLabels) {
+		const pos = findBestWhitespace(
+			spec.anchorX, spec.anchorY,
+			spec.clusterCX, spec.clusterCY, spec.clusterR,
+			grid, cols, rows
+		);
+		whitespaceTargets.set(spec.id, pos);
+		markOccupied(pos[0], pos[1], halfWidth(spec.label), grid, cols, rows);
+	}
+
+	// Phase 3: collision refinement
+	const simNodes: SimNode[] = rawLabels.map((spec) => {
+		const [wx, wy] = whitespaceTargets.get(spec.id)!;
+		return { ...spec, x: wx, y: wy, vx: 0, vy: 0 };
+	});
 
 	const sim = forceSimulation<SimNode>(simNodes)
 		.force(
 			'collide',
-			forceCollide<SimNode>((d) => halfWidth(d.label) + 10)
-				.strength(0.9)
-				.iterations(4)
+			forceCollide<SimNode>((d) => halfWidth(d.label) + 8)
+				.strength(1.0)
+				.iterations(6)
 		)
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		.force('anchor', anchorForce(0.14) as any)
+		.force('wsAnchor', whitespaceAnchorForce(whitespaceTargets, 0.35) as any)
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		.force('contain', containmentForce(0.55) as any)
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		.force('dotRepel', dotRepelForce(allNodes, 52, 0.7) as any)
-		.alphaDecay(0.015)
-		.velocityDecay(0.4);
+		.force('contain', containmentForce(0.8) as any)
+		.alphaDecay(0.025)
+		.velocityDecay(0.5);
 
 	sim.stop();
-	for (let i = 0; i < 240; i++) sim.tick();
+	for (let i = 0; i < 150; i++) sim.tick();
 
 	return simNodes.map((n) => ({
 		id: n.id,

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { filteredPublications, disciplines } from '$lib/stores';
-	import { clustersById, disciplineToCluster } from '$lib/data/clusters';
+	import { clustersById, disciplineToCluster, clusterColorForDiscipline } from '$lib/data/clusters';
 	import { disciplinesById, subfieldsById } from '$lib/data/taxonomy';
 	import { runEulerLayout, type EulerNode } from './eulerLayout';
 	import { computeClusterContours, computeBridgeContours, type RegionContour } from './eulerContours';
@@ -111,14 +111,12 @@
 			nodes = runEulerLayout(pubs, discs, w, h);
 			clusterContours = computeClusterContours(nodes, w, h);
 			bridgeContours = computeBridgeContours(nodes, w, h);
-			discLabels = placeDiscLabels(buildRawDiscLabels(nodes), nodes);
+			discLabels = placeDiscLabels(buildRawDiscLabels(nodes), nodes, w, h);
 		}
 	}
 
 	function nodeColor(node: EulerNode): string {
-		const primaryDisc = node.publication.disciplines[0] ?? '';
-		const clusterId = disciplineToCluster.get(primaryDisc) ?? '';
-		return clustersById.get(clusterId)?.color ?? '#888888';
+		return clusterColorForDiscipline(node.publication.disciplines[0] ?? '');
 	}
 
 	onMount(() => {
