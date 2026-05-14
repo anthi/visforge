@@ -131,12 +131,17 @@ export function computeClusterContours(
 			ey = bboxCY + (Math.abs(nx) > 1e-6 ? (ny * sign * bboxHW) / Math.abs(nx) : 0);
 		}
 
+		// Clamp so labels stay inside the SVG viewport even when cluster is near an edge
+		const MARGIN = 20;
+		const lx = Math.max(MARGIN, Math.min(width - MARGIN, ex + nx * 32));
+		const ly = Math.max(MARGIN, Math.min(height - MARGIN, ey + ny * 32));
+
 		return [
 			{
 				id: cluster.id,
 				label: cluster.label,
 				path: result.path,
-				labelPos: [ex + nx * 32, ey + ny * 32] as [number, number],
+				labelPos: [lx, ly] as [number, number],
 				color: cluster.color
 			}
 		];

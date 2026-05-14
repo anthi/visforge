@@ -5,6 +5,7 @@
 	import { disciplinesById, subfieldsById } from '$lib/data/taxonomy';
 	import { runEulerLayout, type EulerNode } from './eulerLayout';
 	import { computeClusterContours, computeBridgeContours, type RegionContour } from './eulerContours';
+	import { placeDiscLabels, type PlacedLabel, type RawDiscLabel } from './labelPlacement';
 
 	let container: HTMLDivElement;
 	let width = 900;
@@ -13,10 +14,10 @@
 	let nodes: EulerNode[] = [];
 	let clusterContours: RegionContour[] = [];
 	let bridgeContours: RegionContour[] = [];
+	let discLabels: PlacedLabel[] = [];
 
-	// Disciplines and subfields to show as floating sub-labels inside the diagram.
-	// Positions are computed as the centroid of matching nodes.
-	const DISC_LABELS: { id: string; label: string; layer: 'discipline' | 'subfield' }[] = [
+	// ─── Discipline sub-label specs ───────────────────────────────────────────
+	const DISC_SPECS: { id: string; label: string; layer: 'discipline' | 'subfield' }[] = [
 		{ id: 'information_visualization', label: 'Information Visualization', layer: 'discipline' },
 		{ id: 'hci',                        label: 'HCI',                        layer: 'discipline' },
 		{ id: 'psychology',                 label: 'Psychology',                 layer: 'discipline' },
@@ -32,26 +33,75 @@
 		{ id: 'sociology',                  label: 'Sociology',                  layer: 'discipline' },
 	];
 
-	type DiscLabel = { id: string; label: string; x: number; y: number; color: string };
+	/** Build raw placement specs by computing per-discipline centroids and cluster stats. */
+	function buildRawDiscLabels(ns: EulerNode[]): RawDiscLabel[] {
+		// Cluster centroids and 85th-percentile radii from actual node positions
+		const clusterBuckets = new Map<string, EulerNode[]>();
+		for (const n of ns) {
+			const cId = disciplineToCluster.get(n.publication.disciplines[0] ?? '') ?? '';
+			if (!clusterBuckets.has(cId)) clusterBuckets.set(cId, []);
+			clusterBuckets.get(cId)!.push(n);
+		}
 
-	function computeDiscLabels(ns: EulerNode[]): DiscLabel[] {
-		return DISC_LABELS.flatMap((spec) => {
+		const clusterStats = new Map<string, { cx: number; cy: number; r: number }>();
+		for (const [cId, cnodes] of clusterBuckets) {
+			const cx = cnodes.reduce((s, n) => s + n.x, 0) / cnodes.length;
+			const cy = cnodes.reduce((s, n) => s + n.y, 0) / cnodes.length;
+			const dists = cnodes
+				.map((n) => Math.sqrt((n.x - cx) ** 2 + (n.y - cy) ** 2))
+				.sort((a, b) => a - b);
+			// 85th percentile × 1.1 gives a generous but bounded cluster territory
+			const r = (dists[Math.floor(dists.length * 0.85)] ?? dists[dists.length - 1]) * 1.1;
+			clusterStats.set(cId, { cx, cy, r });
+		}
+
+		return DISC_SPECS.flatMap((spec) => {
 			const matching =
 				spec.layer === 'discipline'
 					? ns.filter((n) => n.publication.disciplines.includes(spec.id))
 					: ns.filter((n) => n.publication.subfields.includes(spec.id));
 			if (matching.length < 2) return [];
-			const x = matching.reduce((s, n) => s + n.x, 0) / matching.length;
-			const y = matching.reduce((s, n) => s + n.y, 0) / matching.length;
-			// Color from discipline or subfield taxonomy entry; fall back to cluster color
+
+			const anchorX = matching.reduce((s, n) => s + n.x, 0) / matching.length;
+			const anchorY = matching.reduce((s, n) => s + n.y, 0) / matching.length;
+
+			// For subfields, find the dominant cluster among matching nodes
+			let clusterId: string;
+			if (spec.layer === 'discipline') {
+				clusterId = disciplineToCluster.get(spec.id) ?? '';
+			} else {
+				const counts = new Map<string, number>();
+				for (const n of matching) {
+					const cId = disciplineToCluster.get(n.publication.disciplines[0] ?? '') ?? '';
+					counts.set(cId, (counts.get(cId) ?? 0) + 1);
+				}
+				clusterId =
+					[...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+			}
+
+			const stats = clusterStats.get(clusterId) ?? { cx: anchorX, cy: anchorY, r: 120 };
 			const color =
 				disciplinesById.get(spec.id)?.color ??
 				subfieldsById.get(spec.id)?.color ??
-				(clustersById.get(disciplineToCluster.get(spec.id) ?? '')?.color ?? '#444444');
-			return [{ id: spec.id, label: spec.label, x, y, color }];
+				clustersById.get(clusterId)?.color ??
+				'#444444';
+
+			return [
+				{
+					id: spec.id,
+					label: spec.label,
+					anchorX,
+					anchorY,
+					color,
+					clusterCX: stats.cx,
+					clusterCY: stats.cy,
+					clusterR: stats.r
+				}
+			];
 		});
 	}
 
+	// ─── Reactive layout ──────────────────────────────────────────────────────
 	$: {
 		const pubs = $filteredPublications;
 		const discs = $disciplines;
@@ -61,10 +111,9 @@
 			nodes = runEulerLayout(pubs, discs, w, h);
 			clusterContours = computeClusterContours(nodes, w, h);
 			bridgeContours = computeBridgeContours(nodes, w, h);
+			discLabels = placeDiscLabels(buildRawDiscLabels(nodes), nodes);
 		}
 	}
-
-	$: discLabels = computeDiscLabels(nodes);
 
 	function nodeColor(node: EulerNode): string {
 		const primaryDisc = node.publication.disciplines[0] ?? '';
@@ -123,7 +172,7 @@
 			/>
 		{/each}
 
-		<!-- Cluster labels — pushed outward from canvas center, clear of boundaries -->
+		<!-- Cluster labels — pushed outward from canvas center, clamped to viewport -->
 		{#each clusterContours as region}
 			<text
 				x={region.labelPos[0]}
@@ -161,7 +210,7 @@
 			</text>
 		{/each}
 
-		<!-- Discipline sub-labels — centroid of matching nodes, 30% opacity, text only -->
+		<!-- Discipline sub-labels — force-placed within cluster regions, 55% opacity -->
 		{#each discLabels as dl}
 			<text
 				x={dl.x}
@@ -173,7 +222,7 @@
 				font-weight={400}
 				font-family="'JetBrains Mono', 'Fira Mono', monospace"
 				letter-spacing="0.02em"
-				fill-opacity={0.30}
+				fill-opacity={0.55}
 				pointer-events="none"
 			>
 				{dl.label}
