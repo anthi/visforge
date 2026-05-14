@@ -9,14 +9,14 @@ export type RegionContour = {
 	id: string;
 	label: string;
 	path: string;
+	/** Point for label placement — already offset outward from the boundary. */
 	labelPos: [number, number];
 	color: string;
-	/** Sampled boundary points for use as obstacles in label placement. */
-	boundaryPoints: [number, number][];
 };
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
+/** Bounding box of a GeoJSON MultiPolygon coordinate set. */
 function bounds(coordinates: number[][][][]): {
 	minX: number; maxX: number; minY: number; maxY: number;
 } | null {
@@ -34,6 +34,7 @@ function bounds(coordinates: number[][][][]): {
 	return minX === Infinity ? null : { minX, maxX, minY, maxY };
 }
 
+/** Average two hex colours. */
 function blendHex(h1: string, h2: string): string {
 	const p = (h: string, s: number) => parseInt(h.slice(s, s + 2), 16);
 	const r = Math.round((p(h1, 1) + p(h2, 1)) / 2);
@@ -42,31 +43,20 @@ function blendHex(h1: string, h2: string): string {
 	return `rgb(${r},${g},${b})`;
 }
 
-/** Sample n evenly-spaced points from the outer ring of the largest polygon. */
-function sampleBoundary(coordinates: number[][][][], n: number): [number, number][] {
-	let outerRing: number[][] = [];
-	for (const polygon of coordinates) {
-		if (polygon[0] && polygon[0].length > outerRing.length) {
-			outerRing = polygon[0];
-		}
-	}
-	if (outerRing.length === 0) return [];
-
-	const result: [number, number][] = [];
-	const step = Math.max(1, Math.floor(outerRing.length / n));
-	for (let i = 0; i < outerRing.length && result.length < n; i += step) {
-		result.push([outerRing[i][0], outerRing[i][1]]);
-	}
-	return result;
-}
-
+/**
+ * Core KDE contour builder.
+ *
+ * bandwidth  — Gaussian kernel sigma in px. Larger = smoother / wider shape.
+ * levelIndex — Which threshold level to extract (0 = most generous outer contour).
+ *              With thresholds(10), index 1 gives ~10% of peak density.
+ */
 function buildContour(
 	nodes: EulerNode[],
 	width: number,
 	height: number,
 	bandwidth: number,
 	levelIndex: number
-): { path: string; bbox: NonNullable<ReturnType<typeof bounds>>; coordinates: number[][][][] } | null {
+): { path: string; bbox: NonNullable<ReturnType<typeof bounds>> } | null {
 	if (nodes.length < 4) return null;
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,69 +72,24 @@ function buildContour(
 
 	const c = contours[Math.min(levelIndex, contours.length - 1)];
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const coordinates = c.coordinates as number[][][][];
-	const bbox = bounds(coordinates);
+	const bbox = bounds(c.coordinates as any);
 	if (!bbox) return null;
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const pathStr = (geoPath as any)()(c);
 	if (!pathStr) return null;
 
-	return { path: pathStr, bbox, coordinates };
+	return { path: pathStr, bbox };
 }
 
 // ─── Layer 1: Cluster region contours ────────────────────────────────────────
+//
+// Large bandwidth so each cluster reads as one generous organic blob.
+// Level index 1 (of 10) gives the second-outermost contour — generous but
+// not so thin it covers the whole canvas.
 
 const CLUSTER_BANDWIDTH = 72;
 const CLUSTER_LEVEL = 1;
-
-/**
- * Pick the label position outside the cluster bbox with the fewest nearby dots.
- * Probes 4 candidate positions (top/right/bottom/left, OFFSET px outside bbox midpoint)
- * and returns the one with the lowest dot count within RADIUS px, clamped to viewport.
- */
-function clusterLabelPos(
-	bbox: { minX: number; maxX: number; minY: number; maxY: number },
-	allNodes: EulerNode[],
-	width: number,
-	height: number
-): [number, number] {
-	const OFFSET = 40;
-	const RADIUS = 120;
-	const MARGIN = 24;
-
-	const midX = (bbox.minX + bbox.maxX) / 2;
-	const midY = (bbox.minY + bbox.maxY) / 2;
-
-	const candidates: [number, number][] = [
-		[midX,              bbox.minY - OFFSET], // top
-		[bbox.maxX + OFFSET, midY             ], // right
-		[midX,              bbox.maxY + OFFSET], // bottom
-		[bbox.minX - OFFSET, midY             ], // left
-	];
-
-	let bestPos: [number, number] = candidates[0];
-	let bestScore = Infinity;
-
-	for (const [cx, cy] of candidates) {
-		// Discard candidates that land outside the viewport even after clamping would move them
-		const px = Math.max(MARGIN, Math.min(width - MARGIN, cx));
-		const py = Math.max(MARGIN, Math.min(height - MARGIN, cy));
-
-		let score = 0;
-		for (const n of allNodes) {
-			const d = Math.sqrt((n.x - px) ** 2 + (n.y - py) ** 2);
-			if (d < RADIUS) score += 1;
-		}
-
-		if (score < bestScore) {
-			bestScore = score;
-			bestPos = [px, py];
-		}
-	}
-
-	return bestPos;
-}
 
 export function computeClusterContours(
 	nodes: EulerNode[],
@@ -159,22 +104,24 @@ export function computeClusterContours(
 		const result = buildContour(clusterNodes, width, height, CLUSTER_BANDWIDTH, CLUSTER_LEVEL);
 		if (!result) return [];
 
-		const labelPos = clusterLabelPos(result.bbox, nodes, width, height);
-
+		const { minX, maxX, minY } = result.bbox;
 		return [
 			{
 				id: cluster.id,
 				label: cluster.label,
 				path: result.path,
-				labelPos,
-				color: cluster.color,
-				boundaryPoints: sampleBoundary(result.coordinates, 50),
+				labelPos: [(minX + maxX) / 2, minY - 24] as [number, number],
+				color: cluster.color
 			}
 		];
 	});
 }
 
-// ─── Layer 2: Bridge band contours ────────────────────────────────────────────
+// ─── Layer 2: Bridge band contours (Bubble Sets logic) ───────────────────────
+//
+// Narrower bandwidth keeps the band tighter around the bridging publications.
+// Level index 2 (of 10) gives a moderately tight isocontour, avoiding the
+// very outer fringes while still stretching between parent cluster regions.
 
 const BRIDGE_BANDWIDTH = 52;
 const BRIDGE_LEVEL = 2;
@@ -188,37 +135,38 @@ const BRIDGE_DEFS: {
 	{
 		id: 'behavioral_economics',
 		label: 'Behavioral Economics',
-		parentClusters: ['mind', 'formal'],
+		parentClusters: ['mind_behavior', 'formal_computational'],
 		filter: (p) => p.subfields.includes('behavioral_economics')
 	},
 	{
 		id: 'neuroeconomics',
 		label: 'Neuroeconomics',
-		parentClusters: ['mind', 'formal'],
+		parentClusters: ['mind_behavior', 'formal_computational'],
 		filter: (p) => p.subfields.includes('neuroeconomics')
 	},
 	{
 		id: 'ndm',
 		label: 'Naturalistic DM',
-		parentClusters: ['mind', 'societal'],
+		parentClusters: ['mind_behavior', 'collective_societal'],
 		filter: (p) => p.subfields.includes('naturalistic_decision_making')
 	},
 	{
 		id: 'mcdm',
 		label: 'MCDM',
-		parentClusters: ['formal', 'societal'],
+		parentClusters: ['formal_computational', 'collective_societal'],
 		filter: (p) => p.subfields.includes('multi_criteria_decision_making')
 	},
 	{
 		id: 'dss',
 		label: 'Decision Support',
-		parentClusters: ['formal', 'design'],
+		parentClusters: ['formal_computational', 'design_interaction'],
 		filter: (p) => p.subfields.includes('decision_support_systems')
 	},
 	{
 		id: 'xai',
 		label: 'XAI / Explainability',
-		parentClusters: ['formal', 'design'],
+		parentClusters: ['formal_computational', 'design_interaction'],
+		// Publications that cross Formal & Computational and Design & Interaction
 		filter: (p) => {
 			const d = p.disciplines;
 			const inFormal = d.some((x) =>
@@ -239,6 +187,7 @@ export function computeBridgeContours(
 	return BRIDGE_DEFS.flatMap((bridge) => {
 		const bridgeNodes = nodes.filter((n) => bridge.filter(n.publication));
 
+		// XAI has fewer pubs — use slightly wider bandwidth so it still forms a visible band
 		const bw = bridge.id === 'xai' ? 60 : BRIDGE_BANDWIDTH;
 		const result = buildContour(bridgeNodes, width, height, bw, BRIDGE_LEVEL);
 		if (!result) return [];
@@ -253,8 +202,7 @@ export function computeBridgeContours(
 				label: bridge.label,
 				path: result.path,
 				labelPos: [(minX + maxX) / 2, minY - 14] as [number, number],
-				color: blendHex(c1, c2),
-				boundaryPoints: sampleBoundary(result.coordinates, 30),
+				color: blendHex(c1, c2)
 			}
 		];
 	});
