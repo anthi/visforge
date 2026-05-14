@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { filteredPublications, disciplines } from '$lib/stores';
+	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered } from '$lib/stores';
 	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
+	import Tooltip from '$lib/ui/Tooltip.svelte';
 
 	/** Per-cluster visual opacity (0–1). Passed from page; defaults to fully opaque. */
 	export let clusterOpacities: Record<string, number> = {};
@@ -115,6 +116,26 @@
 		return [label.slice(0, splitAt), label.slice(splitAt + 1)];
 	}
 
+	// ─── Hover / tooltip ─────────────────────────────────────────────────────
+	let tooltipX = 0;
+	let tooltipY = 0;
+
+	/** Primary discipline of the currently hovered publication (for highlight logic). */
+	$: hoveredDisc = $hoveredPublication?.disciplines[0] ?? null;
+
+	function handleDotEnter(e: PointerEvent, node: EulerNode) {
+		setHovered(node.id);
+		const rect = container.getBoundingClientRect();
+		const cx = e.clientX - rect.left;
+		const cy = e.clientY - rect.top;
+		tooltipX = cx < width / 2 ? cx + 18 : cx - 228;
+		tooltipY = Math.max(8, Math.min(cy - 50, height - 140));
+	}
+
+	function handleDotLeave() {
+		setHovered(null);
+	}
+
 	onMount(() => {
 		const ro = new ResizeObserver(([entry]) => {
 			width = entry.contentRect.width;
@@ -126,6 +147,7 @@
 </script>
 
 <div class="euler-container" bind:this={container}>
+	<Tooltip pub={$hoveredPublication} x={tooltipX} y={tooltipY} />
 	<svg {width} {height} role="img" aria-label="Euler diagram of decision making publications">
 
 		<!-- Layer 1: Cluster region contours -->
@@ -158,12 +180,21 @@
 
 		<!-- Layer 3: Publication dots -->
 		{#each nodes as node}
+			{@const isHovered = node.id === $hoveredId}
+			{@const dimmed = $hoveredId !== null && node.publication.disciplines[0] !== hoveredDisc}
 			<circle
 				cx={node.x}
 				cy={node.y}
-				r={4}
+				r={isHovered ? 6 : 4}
 				fill={nodeColor(node)}
-				fill-opacity={0.40 * clusterOp(nodeCluster(node))}
+				fill-opacity={
+					$hoveredId
+						? (dimmed ? 0.08 : 0.85)
+						: 0.40 * clusterOp(nodeCluster(node))
+				}
+				style="cursor:pointer"
+				on:pointerenter={(e) => handleDotEnter(e, node)}
+				on:pointerleave={handleDotLeave}
 			/>
 		{/each}
 
