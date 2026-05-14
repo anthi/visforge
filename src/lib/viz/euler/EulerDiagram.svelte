@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered } from '$lib/stores';
+	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts } from '$lib/stores';
 	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
 	import Tooltip from '$lib/ui/Tooltip.svelte';
 
@@ -120,8 +120,11 @@
 	let tooltipX = 0;
 	let tooltipY = 0;
 
-	/** Primary discipline of the currently hovered publication (for highlight logic). */
+	/** Primary discipline of the currently hovered publication (for dot highlight logic). */
 	$: hoveredDisc = $hoveredPublication?.disciplines[0] ?? null;
+
+	// Cluster hover badge position
+	let clusterBadgePos: { x: number; y: number; label: string } | null = null;
 
 	function handleDotEnter(e: PointerEvent, node: EulerNode) {
 		setHovered(node.id);
@@ -134,6 +137,21 @@
 
 	function handleDotLeave() {
 		setHovered(null);
+	}
+
+	function handleClusterEnter(region: RegionContour) {
+		setHoveredCategory(region.id);
+		// Badge appears just below the cluster label
+		clusterBadgePos = {
+			x: region.labelPos[0],
+			y: region.labelPos[1] + 18,
+			label: String($clusterCounts[region.id] ?? 0) + ' papers'
+		};
+	}
+
+	function handleClusterLeave() {
+		setHoveredCategory(null);
+		clusterBadgePos = null;
 	}
 
 	onMount(() => {
@@ -153,14 +171,18 @@
 		<!-- Layer 1: Cluster region contours -->
 		{#each clusterContours as region}
 			{@const op = clusterOp(region.id)}
+			{@const isHoveredCluster = $hoveredCategoryId === region.id}
 			<path
 				d={region.path}
 				fill={region.color}
-				fill-opacity={0.10 * op}
+				fill-opacity={isHoveredCluster ? 0.18 * op : 0.10 * op}
 				stroke={region.color}
-				stroke-width={2.0}
-				stroke-opacity={0.50 * op}
+				stroke-width={isHoveredCluster ? 2.5 : 2.0}
+				stroke-opacity={isHoveredCluster ? 0.75 * op : 0.50 * op}
 				stroke-linejoin="round"
+				style="cursor:default"
+				on:pointerenter={() => handleClusterEnter(region)}
+				on:pointerleave={handleClusterLeave}
 			/>
 		{/each}
 
@@ -181,17 +203,24 @@
 		<!-- Layer 3: Publication dots -->
 		{#each nodes as node}
 			{@const isHovered = node.id === $hoveredId}
-			{@const dimmed = $hoveredId !== null && node.publication.disciplines[0] !== hoveredDisc}
+			{@const nc = nodeCluster(node)}
+			{@const dotOp = (() => {
+				if ($hoveredId !== null) {
+					// dot hover takes priority
+					return node.publication.disciplines[0] !== hoveredDisc ? 0.08 : 0.85;
+				}
+				if ($hoveredCategoryId !== null) {
+					// cluster hover: highlight cluster, dim others
+					return nc === $hoveredCategoryId ? 0.75 : 0.10;
+				}
+				return 0.40 * clusterOp(nc);
+			})()}
 			<circle
 				cx={node.x}
 				cy={node.y}
 				r={isHovered ? 6 : 4}
 				fill={nodeColor(node)}
-				fill-opacity={
-					$hoveredId
-						? (dimmed ? 0.08 : 0.85)
-						: 0.40 * clusterOp(nodeCluster(node))
-				}
+				fill-opacity={dotOp}
 				style="cursor:pointer"
 				on:pointerenter={(e) => handleDotEnter(e, node)}
 				on:pointerleave={handleDotLeave}
@@ -216,6 +245,21 @@
 				{region.label}
 			</text>
 		{/each}
+
+		<!-- Cluster count badge (shown on cluster hover) -->
+		{#if clusterBadgePos}
+			<text
+				x={clusterBadgePos.x}
+				y={clusterBadgePos.y}
+				text-anchor="middle"
+				dominant-baseline="middle"
+				font-size={10}
+				font-family="'JetBrains Mono', 'Fira Mono', monospace"
+				fill="#555"
+				opacity={0.8}
+				pointer-events="none"
+			>{clusterBadgePos.label}</text>
+		{/if}
 
 		<!-- Bridge labels -->
 		{#each bridgeContours as band}
