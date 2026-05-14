@@ -1,19 +1,12 @@
 <script lang="ts">
 	import EulerDiagram from '$lib/viz/euler/EulerDiagram.svelte';
-	import DetailsPanel from '$lib/viz/euler/DetailsPanel.svelte';
-	import { CLUSTERS, clustersById } from '$lib/data/clusters';
+	import { CLUSTERS } from '$lib/data/clusters';
 	import {
-		disciplines,
 		filteredPublications,
-		activeDisciplines,
 		searchQuery,
 		yearRange,
 		yearBounds,
-		toggleDiscipline,
-		clearFilters,
-		expandedClusterId,
-		expandCluster,
-		collapseToOverview
+		clearFilters
 	} from '$lib/stores';
 </script>
 
@@ -24,48 +17,18 @@
 			<p class="subtitle">{$filteredPublications.length} publications</p>
 		</header>
 
-		<!-- Navigation: cluster overview or expanded cluster -->
 		<section>
-			{#if $expandedClusterId === null}
-				<p class="section-label">Clusters</p>
-				<div class="chip-list">
-					{#each CLUSTERS as cluster}
-						<button
-							class="cluster-chip"
-							style="--color: {cluster.color}"
-							onclick={() => expandCluster(cluster.id)}
-							title={cluster.description}
-						>
-							{cluster.label}
-						</button>
-					{/each}
-				</div>
-			{:else}
-				{@const cluster = clustersById.get($expandedClusterId)}
-				<button class="back-link" onclick={collapseToOverview}>← All Clusters</button>
-				{#if cluster}
-					<p class="cluster-heading" style="--color: {cluster.color}">{cluster.label}</p>
-					<p class="cluster-desc">{cluster.description}</p>
-					<div class="chip-list">
-						{#each cluster.disciplines as discId}
-							{@const disc = $disciplines.find((d) => d.id === discId)}
-							{#if disc}
-								<button
-									class="disc-chip"
-									class:active={$activeDisciplines.has(disc.id)}
-									style="--color: {disc.color}"
-									onclick={() => toggleDiscipline(disc.id)}
-								>
-									{disc.label}
-								</button>
-							{/if}
-						{/each}
+			<p class="section-label">Clusters</p>
+			<div class="legend">
+				{#each CLUSTERS as cluster}
+					<div class="legend-row">
+						<span class="swatch" style="background: {cluster.color}"></span>
+						<span class="legend-label">{cluster.label}</span>
 					</div>
-				{/if}
-			{/if}
+				{/each}
+			</div>
 		</section>
 
-		<!-- Search (always visible) -->
 		<section>
 			<label for="search">Search</label>
 			<input
@@ -76,7 +39,6 @@
 			/>
 		</section>
 
-		<!-- Year range (always visible) -->
 		<section>
 			<p class="section-label">Years</p>
 			<div class="year-row">
@@ -101,7 +63,6 @@
 
 	<main class="canvas">
 		<EulerDiagram />
-		<DetailsPanel />
 	</main>
 </div>
 
@@ -162,83 +123,31 @@
 		margin: 0;
 	}
 
-	.chip-list {
+	.legend {
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
+		gap: 0.38rem;
 	}
 
-	/* ── Cluster chips (Level 1) ── */
-	.cluster-chip {
-		font-family: inherit;
-		font-size: 0.74rem;
-		font-weight: 600;
-		padding: 0.32rem 0.6rem;
-		border: 2px solid var(--color);
-		border-radius: 3px;
-		background: transparent;
-		color: var(--color);
-		cursor: pointer;
-		text-align: left;
-		transition: background 0.12s, color 0.12s;
+	.legend-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 	}
 
-	.cluster-chip:hover {
-		background: var(--color);
-		color: #fff;
+	.swatch {
+		display: inline-block;
+		width: 10px;
+		height: 10px;
+		border-radius: 2px;
+		flex-shrink: 0;
 	}
 
-	/* ── Back link (Level 2 header) ── */
-	.back-link {
-		font-family: inherit;
-		font-size: 0.68rem;
-		background: none;
-		border: none;
-		color: #888;
-		cursor: pointer;
-		padding: 0;
-		text-align: left;
-		align-self: flex-start;
-	}
-
-	.back-link:hover {
-		color: #333;
-	}
-
-	.cluster-heading {
-		margin: 0;
-		font-size: 0.8rem;
-		font-weight: 700;
-		color: var(--color);
-	}
-
-	.cluster-desc {
-		margin: 0;
-		font-size: 0.65rem;
-		color: #999;
-		line-height: 1.4;
-	}
-
-	/* ── Discipline chips (Level 2 filter) ── */
-	.disc-chip {
-		font-family: inherit;
+	.legend-label {
 		font-size: 0.72rem;
-		padding: 0.28rem 0.55rem;
-		border: 1.5px solid var(--color);
-		border-radius: 3px;
-		background: transparent;
-		color: var(--color);
-		cursor: pointer;
-		text-align: left;
-		transition: background 0.12s, color 0.12s;
+		color: #444;
 	}
 
-	.disc-chip.active {
-		background: var(--color);
-		color: #fff;
-	}
-
-	/* ── Search ── */
 	input[type='text'] {
 		font-family: inherit;
 		font-size: 0.78rem;
@@ -254,7 +163,6 @@
 		border-color: #aaa;
 	}
 
-	/* ── Year range ── */
 	.year-row {
 		display: flex;
 		align-items: center;
