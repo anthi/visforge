@@ -104,13 +104,39 @@ export function computeClusterContours(
 		const result = buildContour(clusterNodes, width, height, CLUSTER_BANDWIDTH, CLUSTER_LEVEL);
 		if (!result) return [];
 
-		const { minX, maxX, minY } = result.bbox;
+		// Push label outward from canvas center so it clears the contour boundary
+		const ncx = clusterNodes.reduce((s, n) => s + n.x, 0) / clusterNodes.length;
+		const ncy = clusterNodes.reduce((s, n) => s + n.y, 0) / clusterNodes.length;
+		const dx = ncx - width / 2;
+		const dy = ncy - height / 2;
+		const len = Math.sqrt(dx * dx + dy * dy);
+		const nx = len > 0 ? dx / len : 0;
+		const ny = len > 0 ? dy / len : -1;
+
+		const { minX, maxX, minY, maxY } = result.bbox;
+		const bboxCX = (minX + maxX) / 2;
+		const bboxCY = (minY + maxY) / 2;
+		const bboxHW = (maxX - minX) / 2;
+		const bboxHH = (maxY - minY) / 2;
+
+		// Find the point on the bounding box perimeter in direction (nx, ny)
+		let ex: number, ey: number;
+		if (Math.abs(ny) * bboxHW >= Math.abs(nx) * bboxHH) {
+			const sign = ny <= 0 ? -1 : 1;
+			ey = bboxCY + sign * bboxHH;
+			ex = bboxCX + (Math.abs(ny) > 1e-6 ? (nx * sign * bboxHH) / Math.abs(ny) : 0);
+		} else {
+			const sign = nx < 0 ? -1 : 1;
+			ex = bboxCX + sign * bboxHW;
+			ey = bboxCY + (Math.abs(nx) > 1e-6 ? (ny * sign * bboxHW) / Math.abs(nx) : 0);
+		}
+
 		return [
 			{
 				id: cluster.id,
 				label: cluster.label,
 				path: result.path,
-				labelPos: [(minX + maxX) / 2, minY - 24] as [number, number],
+				labelPos: [ex + nx * 32, ey + ny * 32] as [number, number],
 				color: cluster.color
 			}
 		];

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { filteredPublications, disciplines } from '$lib/stores';
 	import { clustersById, disciplineToCluster } from '$lib/data/clusters';
+	import { disciplinesById, subfieldsById } from '$lib/data/taxonomy';
 	import { runEulerLayout, type EulerNode } from './eulerLayout';
 	import { computeClusterContours, computeBridgeContours, type RegionContour } from './eulerContours';
 
@@ -12,6 +13,44 @@
 	let nodes: EulerNode[] = [];
 	let clusterContours: RegionContour[] = [];
 	let bridgeContours: RegionContour[] = [];
+
+	// Disciplines and subfields to show as floating sub-labels inside the diagram.
+	// Positions are computed as the centroid of matching nodes.
+	const DISC_LABELS: { id: string; label: string; layer: 'discipline' | 'subfield' }[] = [
+		{ id: 'information_visualization', label: 'Information Visualization', layer: 'discipline' },
+		{ id: 'hci',                        label: 'HCI',                        layer: 'discipline' },
+		{ id: 'psychology',                 label: 'Psychology',                 layer: 'discipline' },
+		{ id: 'economics',                  label: 'Economics',                  layer: 'discipline' },
+		{ id: 'statistics',                 label: 'Statistics',                 layer: 'discipline' },
+		{ id: 'decision_theory',            label: 'Decision Theory',            layer: 'subfield'   },
+		{ id: 'management_science',         label: 'Management Science',         layer: 'discipline' },
+		{ id: 'neuroscience',               label: 'Neuroscience',               layer: 'discipline' },
+		{ id: 'cognitive_science',          label: 'Cognitive Science',          layer: 'discipline' },
+		{ id: 'philosophy',                 label: 'Philosophy',                 layer: 'discipline' },
+		{ id: 'operations_research',        label: 'Operations Research',        layer: 'discipline' },
+		{ id: 'artificial_intelligence',    label: 'AI',                         layer: 'discipline' },
+		{ id: 'sociology',                  label: 'Sociology',                  layer: 'discipline' },
+	];
+
+	type DiscLabel = { id: string; label: string; x: number; y: number; color: string };
+
+	function computeDiscLabels(ns: EulerNode[]): DiscLabel[] {
+		return DISC_LABELS.flatMap((spec) => {
+			const matching =
+				spec.layer === 'discipline'
+					? ns.filter((n) => n.publication.disciplines.includes(spec.id))
+					: ns.filter((n) => n.publication.subfields.includes(spec.id));
+			if (matching.length < 2) return [];
+			const x = matching.reduce((s, n) => s + n.x, 0) / matching.length;
+			const y = matching.reduce((s, n) => s + n.y, 0) / matching.length;
+			// Color from discipline or subfield taxonomy entry; fall back to cluster color
+			const color =
+				disciplinesById.get(spec.id)?.color ??
+				subfieldsById.get(spec.id)?.color ??
+				(clustersById.get(disciplineToCluster.get(spec.id) ?? '')?.color ?? '#444444');
+			return [{ id: spec.id, label: spec.label, x, y, color }];
+		});
+	}
 
 	$: {
 		const pubs = $filteredPublications;
@@ -24,6 +63,8 @@
 			bridgeContours = computeBridgeContours(nodes, w, h);
 		}
 	}
+
+	$: discLabels = computeDiscLabels(nodes);
 
 	function nodeColor(node: EulerNode): string {
 		const primaryDisc = node.publication.disciplines[0] ?? '';
@@ -82,7 +123,7 @@
 			/>
 		{/each}
 
-		<!-- Cluster labels — placed above the contour bounding box -->
+		<!-- Cluster labels — pushed outward from canvas center, clear of boundaries -->
 		{#each clusterContours as region}
 			<text
 				x={region.labelPos[0]}
@@ -101,7 +142,7 @@
 			</text>
 		{/each}
 
-		<!-- Bridge labels — smaller, placed above the band bounding box -->
+		<!-- Bridge labels -->
 		{#each bridgeContours as band}
 			<text
 				x={band.labelPos[0]}
@@ -117,6 +158,25 @@
 				pointer-events="none"
 			>
 				{band.label}
+			</text>
+		{/each}
+
+		<!-- Discipline sub-labels — centroid of matching nodes, 30% opacity, text only -->
+		{#each discLabels as dl}
+			<text
+				x={dl.x}
+				y={dl.y}
+				text-anchor="middle"
+				dominant-baseline="middle"
+				fill={dl.color}
+				font-size={10}
+				font-weight={400}
+				font-family="'JetBrains Mono', 'Fira Mono', monospace"
+				letter-spacing="0.02em"
+				fill-opacity={0.30}
+				pointer-events="none"
+			>
+				{dl.label}
 			</text>
 		{/each}
 
