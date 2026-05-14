@@ -98,6 +98,54 @@ function buildContour(
 const CLUSTER_BANDWIDTH = 72;
 const CLUSTER_LEVEL = 1;
 
+/**
+ * Pick the label position outside the cluster bbox with the fewest nearby dots.
+ * Probes 4 candidate positions (top/right/bottom/left, OFFSET px outside bbox midpoint)
+ * and returns the one with the lowest dot count within RADIUS px, clamped to viewport.
+ */
+function clusterLabelPos(
+	bbox: { minX: number; maxX: number; minY: number; maxY: number },
+	allNodes: EulerNode[],
+	width: number,
+	height: number
+): [number, number] {
+	const OFFSET = 40;
+	const RADIUS = 120;
+	const MARGIN = 24;
+
+	const midX = (bbox.minX + bbox.maxX) / 2;
+	const midY = (bbox.minY + bbox.maxY) / 2;
+
+	const candidates: [number, number][] = [
+		[midX,              bbox.minY - OFFSET], // top
+		[bbox.maxX + OFFSET, midY             ], // right
+		[midX,              bbox.maxY + OFFSET], // bottom
+		[bbox.minX - OFFSET, midY             ], // left
+	];
+
+	let bestPos: [number, number] = candidates[0];
+	let bestScore = Infinity;
+
+	for (const [cx, cy] of candidates) {
+		// Discard candidates that land outside the viewport even after clamping would move them
+		const px = Math.max(MARGIN, Math.min(width - MARGIN, cx));
+		const py = Math.max(MARGIN, Math.min(height - MARGIN, cy));
+
+		let score = 0;
+		for (const n of allNodes) {
+			const d = Math.sqrt((n.x - px) ** 2 + (n.y - py) ** 2);
+			if (d < RADIUS) score += 1;
+		}
+
+		if (score < bestScore) {
+			bestScore = score;
+			bestPos = [px, py];
+		}
+	}
+
+	return bestPos;
+}
+
 export function computeClusterContours(
 	nodes: EulerNode[],
 	width: number,
@@ -111,42 +159,14 @@ export function computeClusterContours(
 		const result = buildContour(clusterNodes, width, height, CLUSTER_BANDWIDTH, CLUSTER_LEVEL);
 		if (!result) return [];
 
-		// Push label outward from canvas center, clamped to viewport
-		const ncx = clusterNodes.reduce((s, n) => s + n.x, 0) / clusterNodes.length;
-		const ncy = clusterNodes.reduce((s, n) => s + n.y, 0) / clusterNodes.length;
-		const dx = ncx - width / 2;
-		const dy = ncy - height / 2;
-		const len = Math.sqrt(dx * dx + dy * dy);
-		const nx = len > 0 ? dx / len : 0;
-		const ny = len > 0 ? dy / len : -1;
-
-		const { minX, maxX, minY, maxY } = result.bbox;
-		const bboxCX = (minX + maxX) / 2;
-		const bboxCY = (minY + maxY) / 2;
-		const bboxHW = (maxX - minX) / 2;
-		const bboxHH = (maxY - minY) / 2;
-
-		let ex: number, ey: number;
-		if (Math.abs(ny) * bboxHW >= Math.abs(nx) * bboxHH) {
-			const sign = ny <= 0 ? -1 : 1;
-			ey = bboxCY + sign * bboxHH;
-			ex = bboxCX + (Math.abs(ny) > 1e-6 ? (nx * sign * bboxHH) / Math.abs(ny) : 0);
-		} else {
-			const sign = nx < 0 ? -1 : 1;
-			ex = bboxCX + sign * bboxHW;
-			ey = bboxCY + (Math.abs(nx) > 1e-6 ? (ny * sign * bboxHW) / Math.abs(nx) : 0);
-		}
-
-		const MARGIN = 20;
-		const lx = Math.max(MARGIN, Math.min(width - MARGIN, ex + nx * 32));
-		const ly = Math.max(MARGIN, Math.min(height - MARGIN, ey + ny * 32));
+		const labelPos = clusterLabelPos(result.bbox, nodes, width, height);
 
 		return [
 			{
 				id: cluster.id,
 				label: cluster.label,
 				path: result.path,
-				labelPos: [lx, ly] as [number, number],
+				labelPos,
 				color: cluster.color,
 				boundaryPoints: sampleBoundary(result.coordinates, 50),
 			}
