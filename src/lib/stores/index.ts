@@ -11,12 +11,21 @@ export {
 	clustersById
 } from './entities';
 export {
+	type Lens,
+	type YearRange,
 	activeDisciplines,
 	activeSubfields,
 	activeDomains,
 	searchQuery,
 	yearRange,
 	yearBounds,
+	yearCounts,
+	venueFilter,
+	uniqueVenues,
+	currentLens,
+	clusterOpacities,
+	clusterCounts,
+	authorProminence,
 	filteredPublications,
 	toggleDiscipline,
 	toggleSubfield,

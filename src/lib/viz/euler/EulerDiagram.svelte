@@ -2,6 +2,9 @@
 	import { onMount } from 'svelte';
 	import { filteredPublications, disciplines } from '$lib/stores';
 	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
+
+	/** Per-cluster visual opacity (0–1). Passed from page; defaults to fully opaque. */
+	export let clusterOpacities: Record<string, number> = {};
 	import { runEulerLayout, type EulerNode } from './eulerLayout';
 	import { computeClusterContours, computeBridgeContours, type RegionContour } from './eulerContours';
 	import { placeDiscLabels, type PlacedLabel, type RawDiscLabel } from './labelPlacement';
@@ -80,6 +83,23 @@
 		return getDotColor(node.publication);
 	}
 
+	function nodeCluster(node: EulerNode): string {
+		return disciplineToCluster.get(node.publication.disciplines[0] ?? '') ?? 'formal';
+	}
+
+	function clusterOp(id: string): number {
+		return clusterOpacities[id] ?? 1;
+	}
+
+	// Map disc label id → cluster id (for opacity lookup)
+	const DISC_CLUSTER: Record<string, string> = Object.fromEntries(
+		DISC_SPECS.map((s) => [s.id, s.layer === 'discipline' ? (disciplineToCluster.get(s.id) ?? '') : ''])
+	);
+
+	function discLabelCluster(discId: string): string {
+		return DISC_CLUSTER[discId] ?? '';
+	}
+
 	/** Split a label at the word boundary nearest to the string midpoint. */
 	function splitLabel(label: string): [string, string] {
 		const mid = Math.floor(label.length / 2);
@@ -110,13 +130,14 @@
 
 		<!-- Layer 1: Cluster region contours -->
 		{#each clusterContours as region}
+			{@const op = clusterOp(region.id)}
 			<path
 				d={region.path}
 				fill={region.color}
-				fill-opacity={0.10}
+				fill-opacity={0.10 * op}
 				stroke={region.color}
 				stroke-width={2.0}
-				stroke-opacity={0.50}
+				stroke-opacity={0.50 * op}
 				stroke-linejoin="round"
 			/>
 		{/each}
@@ -142,7 +163,7 @@
 				cy={node.y}
 				r={4}
 				fill={nodeColor(node)}
-				fill-opacity={0.40}
+				fill-opacity={0.40 * clusterOp(nodeCluster(node))}
 			/>
 		{/each}
 
@@ -158,7 +179,7 @@
 				font-weight={600}
 				font-family="'JetBrains Mono', 'Fira Mono', monospace"
 				letter-spacing="0.04em"
-				opacity={0.88}
+				opacity={0.88 * clusterOp(region.id)}
 				pointer-events="none"
 			>
 				{region.label}
@@ -186,6 +207,7 @@
 
 		<!-- Discipline sub-labels — ray-cast inside cluster polygon, 55% opacity -->
 		{#each discLabels as dl}
+			{@const dlOp = clusterOp(discLabelCluster(dl.id))}
 			<text
 				x={dl.x}
 				y={dl.y}
@@ -196,7 +218,7 @@
 				font-weight={400}
 				font-family="'JetBrains Mono', 'Fira Mono', monospace"
 				letter-spacing="0.02em"
-				fill-opacity={0.55}
+				fill-opacity={0.55 * dlOp}
 				pointer-events="none"
 			>
 				{#if dl.label.length > 12}
