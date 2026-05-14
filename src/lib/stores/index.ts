@@ -3,10 +3,12 @@ export {
 	disciplines,
 	subfields,
 	domains,
+	clusters,
 	publicationsById,
 	disciplinesById,
 	subfieldsById,
-	domainsById
+	domainsById,
+	clustersById
 } from './entities';
 export {
 	activeDisciplines,
@@ -33,3 +35,4 @@ export {
 	toggleSelection,
 	clearSelection
 } from './interactions';
+export { expandedClusterId, expandCluster, collapseToOverview } from './lens';

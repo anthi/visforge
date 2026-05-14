@@ -12,26 +12,41 @@ export type EulerNode = {
 
 type SimNode = SimulationNodeDatum & { publication: Publication };
 
-// Seed positions for all 16 disciplines — unit square, scaled at runtime.
-// Arrangement encodes intellectual proximity: psychology/cog-sci center-right,
-// quantitative fields (stats/math/OR) bottom-right, social sciences left, etc.
+// Seed positions encode intellectual proximity AND meta-cluster membership.
+// Coordinates are unit-square, scaled by CLUSTER_RADIUS at runtime.
+//
+// Layout regions (clockwise from top):
+//   Design & Interaction   — top-left
+//   Mind & Behavior        — right
+//   Formal & Computational — bottom-right (core) + upper-right (AI/CS bridge)
+//   Collective & Societal  — left
+//   Philosophy             — upper-left (standalone, small)
 const SEED: Record<string, [number, number]> = {
-	information_visualization: [0.0, -1.1],
-	hci:                       [-0.65, -0.85],
-	artificial_intelligence:   [0.65, -0.85],
-	computer_science:          [0.9, -0.5],
-	cognitive_science:         [0.5, -0.1],
-	psychology:                [0.9, 0.3],
-	neuroscience:              [0.65, 0.85],
-	economics:                 [-0.5, 0.9],
-	mathematics:               [0.1, 1.1],
-	statistics:                [0.5, 1.1],
-	operations_research:       [-0.1, 1.0],
-	management_science:        [-0.85, 0.55],
-	philosophy:                [-0.9, -0.1],
-	political_science:         [-1.05, 0.35],
-	sociology:                 [-0.95, 0.75],
-	anthropology:              [-0.75, 0.9]
+	// ── Mind & Behavior (right) ──────────────────────────────────────────────
+	psychology:               [ 1.0,   0.15],
+	cognitive_science:        [ 0.72, -0.25],
+	neuroscience:             [ 0.85,  0.55],
+
+	// ── Formal & Computational (bottom-right; AI/CS bridge upper-right) ──────
+	economics:                [ 0.2,   0.88],
+	mathematics:              [ 0.45,  1.1 ],
+	statistics:               [ 0.7,   1.0 ],
+	operations_research:      [ 0.05,  1.0 ],
+	artificial_intelligence:  [ 0.62, -0.72],
+	computer_science:         [ 0.9,  -0.5 ],
+
+	// ── Design & Interaction (top-left) ───────────────────────────────────────
+	information_visualization:[-0.15, -1.05],
+	hci:                      [-0.62, -0.82],
+
+	// ── Collective & Societal (left) ──────────────────────────────────────────
+	management_science:       [-0.7,   0.45],
+	sociology:                [-0.92,  0.75],
+	anthropology:             [-0.72,  0.95],
+	political_science:        [-1.0,   0.2 ],
+
+	// ── Philosophy (upper-left, standalone) ───────────────────────────────────
+	philosophy:               [-0.85, -0.32],
 };
 
 const CLUSTER_RADIUS = 240;

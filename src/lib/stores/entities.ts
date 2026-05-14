@@ -1,11 +1,13 @@
 import { derived, readable } from 'svelte/store';
 import { mockPublications } from '$lib/data/mock/publications';
 import { DISCIPLINES, SUBFIELDS, DOMAINS } from '$lib/data/taxonomy';
+import { CLUSTERS } from '$lib/data/clusters';
 
 export const publications = readable(mockPublications);
 export const disciplines = readable(DISCIPLINES);
 export const subfields = readable(SUBFIELDS);
 export const domains = readable(DOMAINS);
+export const clusters = readable(CLUSTERS);
 
 export const publicationsById = derived(publications, ($pubs) =>
 	new Map($pubs.map((p) => [p.id, p]))
@@ -21,4 +23,8 @@ export const subfieldsById = derived(subfields, ($subs) =>
 
 export const domainsById = derived(domains, ($doms) =>
 	new Map($doms.map((d) => [d.id, d]))
+);
+
+export const clustersById = derived(clusters, ($cs) =>
+	new Map($cs.map((c) => [c.id, c]))
 );

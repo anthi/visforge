@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { CLUSTERS, clustersById, disciplineToCluster } from '$lib/data/clusters';
 	import {
 		disciplines,
 		disciplinesById,
@@ -11,13 +12,16 @@
 		setHovered,
 		setHoveredCategory,
 		selectSingle,
-		clearSelection
+		clearSelection,
+		expandedClusterId,
+		expandCluster,
+		collapseToOverview
 	} from '$lib/stores';
-	import { publicationColor } from '$lib/viz/core/colors';
 	import { tooltipPosition } from '$lib/viz/core/interactions';
-	import { nodeOpacity, nodeRadius } from './eulerInteractions';
+	import { getNodeColor, getNodeRegion, nodeOpacity, nodeRadius } from './eulerInteractions';
 	import { runEulerLayout, type EulerNode } from './eulerLayout';
-	import { computeHulls, type HullData } from './eulerGeometry';
+	import { computeHullsForRegions, type HullData } from './eulerGeometry';
+	import type { TaxonomyEntry } from '$lib/models/taxonomy';
 
 	let container: HTMLDivElement;
 	let width = 900;
@@ -28,6 +32,15 @@
 	let nodes: EulerNode[] = [];
 	let hulls: Map<string, HullData> = new Map();
 
+	type VisRegion = { id: string; label: string; color: string; isCluster: boolean };
+	let visRegions: VisRegion[] = CLUSTERS.map((c) => ({
+		id: c.id,
+		label: c.label,
+		color: c.color,
+		isCluster: true
+	}));
+
+	// ── Block 1: re-layout when publications or canvas size changes ────────────
 	$: {
 		const pubs = $filteredPublications;
 		const discs = $disciplines;
@@ -35,19 +48,62 @@
 		const h = height;
 		if (pubs.length > 0 && w > 0 && h > 0) {
 			nodes = runEulerLayout(pubs, discs, w, h);
-			hulls = computeHulls(nodes, discs.map((d) => d.id));
+		}
+	}
+
+	// ── Block 2: rebuild regions + hulls when nodes or expansion state changes ─
+	$: {
+		const expanded = $expandedClusterId;
+		const discById = $disciplinesById as Map<string, TaxonomyEntry>;
+
+		// Compute visual regions
+		if (expanded === null) {
+			visRegions = CLUSTERS.map((c) => ({ id: c.id, label: c.label, color: c.color, isCluster: true }));
+		} else {
+			const regs: VisRegion[] = [];
+			for (const c of CLUSTERS) {
+				if (c.id !== expanded) {
+					regs.push({ id: c.id, label: c.label, color: c.color, isCluster: true });
+				}
+			}
+			const cluster = clustersById.get(expanded);
+			if (cluster) {
+				for (const discId of cluster.disciplines) {
+					const disc = discById.get(discId);
+					if (disc) regs.push({ id: disc.id, label: disc.label, color: disc.color, isCluster: false });
+				}
+			}
+			visRegions = regs;
+		}
+
+		// Compute hulls for the computed regions
+		if (nodes.length > 0) {
+			hulls = computeHullsForRegions(
+				nodes,
+				visRegions.map((r) => r.id),
+				(n) => getNodeRegion(n, expanded, disciplineToCluster)
+			);
 		}
 	}
 
 	$: tooltipPos =
-		$hoveredPublication && mouseX > 0
-			? tooltipPosition(mouseX, mouseY, width, height)
-			: null;
+		$hoveredPublication && mouseX > 0 ? tooltipPosition(mouseX, mouseY, width, height) : null;
 
 	function trackMouse(e: MouseEvent) {
 		const rect = container.getBoundingClientRect();
 		mouseX = e.clientX - rect.left;
 		mouseY = e.clientY - rect.top;
+	}
+
+	function handleHullClick(region: VisRegion) {
+		if ($expandedClusterId === null && region.isCluster) {
+			expandCluster(region.id);
+		}
+	}
+
+	function handleSvgClick() {
+		clearSelection();
+		if ($expandedClusterId !== null) collapseToOverview();
 	}
 
 	onMount(() => {
@@ -62,38 +118,61 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="euler-container" bind:this={container}>
+	<!-- Breadcrumb overlay when a cluster is expanded -->
+	{#if $expandedClusterId !== null}
+		{@const cluster = clustersById.get($expandedClusterId)}
+		<div class="breadcrumb">
+			<button class="back-btn" on:click={collapseToOverview}>← All Clusters</button>
+			{#if cluster}
+				<span class="crumb-sep">/</span>
+				<span class="crumb-label" style="color: {cluster.color}">{cluster.label}</span>
+			{/if}
+		</div>
+	{/if}
+
 	<svg
 		{width}
 		{height}
-		on:click={clearSelection}
-		on:mouseleave={() => { setHovered(null); setHoveredCategory(null); }}
+		on:click={handleSvgClick}
+		on:mouseleave={() => {
+			setHovered(null);
+			setHoveredCategory(null);
+		}}
 		role="img"
 		aria-label="Euler diagram of publications"
 	>
-		<!-- Hull fills -->
-		{#each $disciplines as disc}
-			{@const hull = hulls.get(disc.id)}
+		<!-- Hulls -->
+		{#each visRegions as region}
+			{@const hull = hulls.get(region.id)}
 			{#if hull?.path}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<path
 					d={hull.path}
-					fill={disc.color}
-					fill-opacity={$hoveredCategoryId && $hoveredCategoryId !== disc.id ? 0.03 : 0.10}
-					stroke={disc.color}
-					stroke-width="1.5"
-					stroke-opacity={$hoveredCategoryId && $hoveredCategoryId !== disc.id ? 0.18 : 0.55}
+					fill={region.color}
+					fill-opacity={$hoveredCategoryId && $hoveredCategoryId !== region.id
+						? 0.02
+						: region.isCluster
+							? 0.11
+							: 0.09}
+					stroke={region.color}
+					stroke-width={region.isCluster ? 2.0 : 1.4}
+					stroke-opacity={$hoveredCategoryId && $hoveredCategoryId !== region.id ? 0.15 : 0.55}
 					stroke-linejoin="round"
-					on:mouseenter={() => setHoveredCategory(disc.id)}
+					stroke-dasharray={region.isCluster ? 'none' : '6 3'}
+					style={region.isCluster && $expandedClusterId === null ? 'cursor: pointer' : ''}
+					on:mouseenter={() => setHoveredCategory(region.id)}
 					on:mouseleave={() => setHoveredCategory(null)}
+					on:click|stopPropagation={() => handleHullClick(region)}
 				/>
 			{/if}
 		{/each}
 
 		<!-- Publication nodes -->
 		{#each nodes as node}
-			{@const color = publicationColor(node.publication.disciplines, $disciplinesById)}
-			{@const opacity = nodeOpacity(node, $hoveredId, $selectedIds, $hoveredCategoryId)}
-			{@const r = nodeRadius(node, $hoveredId, $selectedIds)}
+			{@const region = getNodeRegion(node, $expandedClusterId, disciplineToCluster)}
+			{@const color = getNodeColor(node, $expandedClusterId, disciplineToCluster, $disciplinesById, clustersById)}
+			{@const opacity = nodeOpacity(region, $hoveredId, node.id, $selectedIds, $hoveredCategoryId)}
+			{@const r = nodeRadius(node.id, $hoveredId, $selectedIds)}
 			{@const isSelected = $selectedIds.has(node.id)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<circle
@@ -107,7 +186,7 @@
 				style="cursor: pointer;"
 				on:mouseenter={(e) => {
 					setHovered(node.id);
-					setHoveredCategory(node.publication.disciplines[0] ?? null);
+					setHoveredCategory(region);
 					trackMouse(e);
 				}}
 				on:mousemove={trackMouse}
@@ -115,30 +194,28 @@
 					setHovered(null);
 					setHoveredCategory(null);
 				}}
-				on:click={(e) => {
-					e.stopPropagation();
-					selectSingle(node.id);
-				}}
+				on:click|stopPropagation={() => selectSingle(node.id)}
 			/>
 		{/each}
 
-		<!-- Discipline labels -->
-		{#each $disciplines as disc}
-			{@const hull = hulls.get(disc.id)}
+		<!-- Region labels -->
+		{#each visRegions as region}
+			{@const hull = hulls.get(region.id)}
 			{#if hull?.labelAnchor}
 				<text
 					x={hull.labelAnchor[0]}
 					y={hull.labelAnchor[1]}
 					text-anchor="middle"
 					dominant-baseline="middle"
-					fill={disc.color}
-					font-size="11"
+					fill={region.color}
+					font-size={region.isCluster ? 13 : 10}
+					font-weight={region.isCluster ? 600 : 400}
 					font-family="'JetBrains Mono', 'Fira Mono', monospace"
-					letter-spacing="0.02em"
-					opacity={$hoveredCategoryId && $hoveredCategoryId !== disc.id ? 0.2 : 0.85}
+					letter-spacing="0.03em"
+					opacity={$hoveredCategoryId && $hoveredCategoryId !== region.id ? 0.2 : 0.88}
 					pointer-events="none"
 				>
-					{disc.label}
+					{region.label}
 				</text>
 			{/if}
 		{/each}
@@ -155,9 +232,7 @@
 					.map((a) => a.name)
 					.join(', ')}{pub.authors.length > 2 ? ' et al.' : ''}
 			</p>
-			<p class="tt-meta">
-				{[pub.year, pub.venue].filter(Boolean).join(' · ')}
-			</p>
+			<p class="tt-meta">{[pub.year, pub.venue].filter(Boolean).join(' · ')}</p>
 			<div class="tt-tags">
 				{#each pub.disciplines as discId}
 					{@const disc = $disciplinesById.get(discId)}
@@ -183,6 +258,49 @@
 		display: block;
 	}
 
+	/* ── Breadcrumb ── */
+	.breadcrumb {
+		position: absolute;
+		top: 0.9rem;
+		left: 1rem;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		z-index: 10;
+		pointer-events: none;
+	}
+
+	.back-btn {
+		pointer-events: all;
+		font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+		font-size: 0.7rem;
+		padding: 0.22rem 0.55rem;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		background: rgba(255, 255, 252, 0.92);
+		color: #555;
+		cursor: pointer;
+		transition: background 0.1s, color 0.1s;
+	}
+
+	.back-btn:hover {
+		background: #f0efeb;
+		color: #222;
+	}
+
+	.crumb-sep {
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 0.7rem;
+		color: #bbb;
+	}
+
+	.crumb-label {
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 0.7rem;
+		font-weight: 600;
+	}
+
+	/* ── Tooltip ── */
 	.tooltip {
 		position: absolute;
 		pointer-events: none;
