@@ -1,18 +1,33 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { categories, categoriesById, filteredPublications } from '$lib/stores';
+	import {
+		categories,
+		categoriesById,
+		filteredPublications,
+		hoveredId,
+		hoveredCategoryId,
+		hoveredPublication,
+		selectedIds,
+		setHovered,
+		setHoveredCategory,
+		selectSingle,
+		clearSelection
+	} from '$lib/stores';
 	import { publicationColor } from '$lib/viz/core/colors';
+	import { tooltipPosition } from '$lib/viz/core/interactions';
+	import { nodeOpacity, nodeRadius } from './eulerInteractions';
 	import { runEulerLayout, type EulerNode } from './eulerLayout';
 	import { computeHulls, type HullData } from './eulerGeometry';
 
 	let container: HTMLDivElement;
 	let width = 900;
 	let height = 680;
+	let mouseX = 0;
+	let mouseY = 0;
 
 	let nodes: EulerNode[] = [];
 	let hulls: Map<string, HullData> = new Map();
 
-	// Recompute whenever filtered data or dimensions change
 	$: {
 		const pubs = $filteredPublications;
 		const cats = $categories;
@@ -22,6 +37,17 @@
 			nodes = runEulerLayout(pubs, cats, w, h);
 			hulls = computeHulls(nodes, cats.map((c) => c.id));
 		}
+	}
+
+	$: tooltipPos =
+		$hoveredPublication && mouseX > 0
+			? tooltipPosition(mouseX, mouseY, width, height)
+			: null;
+
+	function trackMouse(e: MouseEvent) {
+		const rect = container.getBoundingClientRect();
+		mouseX = e.clientX - rect.left;
+		mouseY = e.clientY - rect.top;
 	}
 
 	onMount(() => {
@@ -34,20 +60,31 @@
 	});
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="euler-container" bind:this={container}>
-	<svg {width} {height}>
-		<!-- Hull fills — rendered back-to-front so smaller hulls appear on top -->
+	<svg
+		{width}
+		{height}
+		on:click={clearSelection}
+		on:mouseleave={() => { setHovered(null); setHoveredCategory(null); }}
+		role="img"
+		aria-label="Euler diagram of publications"
+	>
+		<!-- Hull fills -->
 		{#each $categories as cat}
 			{@const hull = hulls.get(cat.id)}
 			{#if hull?.path}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<path
 					d={hull.path}
 					fill={cat.color}
-					fill-opacity="0.10"
+					fill-opacity={$hoveredCategoryId && $hoveredCategoryId !== cat.id ? 0.03 : 0.10}
 					stroke={cat.color}
 					stroke-width="1.5"
-					stroke-opacity="0.55"
+					stroke-opacity={$hoveredCategoryId && $hoveredCategoryId !== cat.id ? 0.18 : 0.55}
 					stroke-linejoin="round"
+					on:mouseenter={() => setHoveredCategory(cat.id)}
+					on:mouseleave={() => setHoveredCategory(null)}
 				/>
 			{/if}
 		{/each}
@@ -55,18 +92,37 @@
 		<!-- Publication nodes -->
 		{#each nodes as node}
 			{@const color = publicationColor(node.publication.categories, $categoriesById)}
+			{@const opacity = nodeOpacity(node, $hoveredId, $selectedIds, $hoveredCategoryId)}
+			{@const r = nodeRadius(node, $hoveredId, $selectedIds)}
+			{@const isSelected = $selectedIds.has(node.id)}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<circle
 				cx={node.x}
 				cy={node.y}
-				r={4.5}
+				{r}
 				fill={color}
-				fill-opacity="0.72"
-				stroke="#fff"
-				stroke-width="0.8"
+				fill-opacity={opacity}
+				stroke={isSelected ? '#1a1a1a' : '#fff'}
+				stroke-width={isSelected ? 1.5 : 0.8}
+				style="cursor: pointer;"
+				on:mouseenter={(e) => {
+					setHovered(node.id);
+					setHoveredCategory(node.publication.categories[0] ?? null);
+					trackMouse(e);
+				}}
+				on:mousemove={trackMouse}
+				on:mouseleave={() => {
+					setHovered(null);
+					setHoveredCategory(null);
+				}}
+				on:click={(e) => {
+					e.stopPropagation();
+					selectSingle(node.id);
+				}}
 			/>
 		{/each}
 
-		<!-- Category labels — above nodes so they read clearly -->
+		<!-- Category labels -->
 		{#each $categories as cat}
 			{@const hull = hulls.get(cat.id)}
 			{#if hull?.labelAnchor}
@@ -79,7 +135,7 @@
 					font-size="11"
 					font-family="'JetBrains Mono', 'Fira Mono', monospace"
 					letter-spacing="0.02em"
-					opacity="0.85"
+					opacity={$hoveredCategoryId && $hoveredCategoryId !== cat.id ? 0.2 : 0.85}
 					pointer-events="none"
 				>
 					{cat.label}
@@ -87,10 +143,36 @@
 			{/if}
 		{/each}
 	</svg>
+
+	<!-- Tooltip -->
+	{#if $hoveredPublication && tooltipPos}
+		{@const pub = $hoveredPublication}
+		<div class="tooltip" style="left: {tooltipPos.x}px; top: {tooltipPos.y}px;">
+			<p class="tt-title">{pub.title}</p>
+			<p class="tt-byline">
+				{pub.authors
+					.slice(0, 2)
+					.map((a) => a.name)
+					.join(', ')}{pub.authors.length > 2 ? ' et al.' : ''}
+			</p>
+			<p class="tt-meta">
+				{[pub.year, pub.venue].filter(Boolean).join(' · ')}
+			</p>
+			<div class="tt-cats">
+				{#each pub.categories as catId}
+					{@const cat = $categoriesById.get(catId)}
+					{#if cat}
+						<span class="tt-cat" style="--c: {cat.color}">{cat.label}</span>
+					{/if}
+				{/each}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
 	.euler-container {
+		position: relative;
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
@@ -99,5 +181,61 @@
 
 	svg {
 		display: block;
+	}
+
+	/* ── Tooltip ── */
+	.tooltip {
+		position: absolute;
+		pointer-events: none;
+		width: 248px;
+		background: rgba(255, 255, 252, 0.96);
+		border: 1px solid #e0ddd8;
+		border-radius: 5px;
+		padding: 0.65rem 0.8rem 0.6rem;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.09);
+		z-index: 10;
+	}
+
+	.tt-title {
+		margin: 0 0 0.3rem;
+		font-size: 0.73rem;
+		font-weight: 600;
+		color: #1a1a1a;
+		line-height: 1.35;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.tt-byline {
+		margin: 0 0 0.18rem;
+		font-size: 0.68rem;
+		color: #555;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.tt-meta {
+		margin: 0 0 0.4rem;
+		font-size: 0.66rem;
+		color: #888;
+	}
+
+	.tt-cats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+	}
+
+	.tt-cat {
+		font-size: 0.6rem;
+		padding: 0.15rem 0.4rem;
+		border-radius: 2px;
+		border: 1px solid var(--c);
+		color: var(--c);
+		white-space: nowrap;
 	}
 </style>

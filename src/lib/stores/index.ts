@@ -10,10 +10,13 @@ export {
 } from './filters';
 export {
 	hoveredId,
+	hoveredCategoryId,
 	selectedIds,
 	hoveredPublication,
 	selectedPublications,
 	setHovered,
+	setHoveredCategory,
+	selectSingle,
 	toggleSelection,
 	clearSelection
 } from './interactions';

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EulerDiagram from '$lib/viz/euler/EulerDiagram.svelte';
+	import DetailsPanel from '$lib/viz/euler/DetailsPanel.svelte';
 	import {
 		categories,
 		filteredPublications,
@@ -69,6 +70,7 @@
 
 	<main class="canvas">
 		<EulerDiagram />
+		<DetailsPanel />
 	</main>
 </div>
 
@@ -201,6 +203,7 @@
 	}
 
 	.canvas {
+		position: relative;
 		flex: 1;
 		overflow: hidden;
 	}
