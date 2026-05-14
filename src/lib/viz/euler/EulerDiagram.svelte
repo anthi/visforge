@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { filteredPublications, disciplines } from '$lib/stores';
-	import { clustersById, disciplineToCluster, clusterColorForDiscipline } from '$lib/data/clusters';
+	import { clustersById, disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
 	import { disciplinesById, subfieldsById } from '$lib/data/taxonomy';
 	import { runEulerLayout, type EulerNode } from './eulerLayout';
 	import { computeClusterContours, computeBridgeContours, type RegionContour } from './eulerContours';
@@ -83,7 +83,7 @@
 			const color =
 				disciplinesById.get(spec.id)?.color ??
 				subfieldsById.get(spec.id)?.color ??
-				clustersById.get(clusterId)?.color ??
+				CLUSTER_COLORS[clusterId] ??
 				'#444444';
 
 			return [
@@ -111,12 +111,20 @@
 			nodes = runEulerLayout(pubs, discs, w, h);
 			clusterContours = computeClusterContours(nodes, w, h);
 			bridgeContours = computeBridgeContours(nodes, w, h);
-			discLabels = placeDiscLabels(buildRawDiscLabels(nodes), nodes, w, h);
+
+			// Collect all boundary sample points as label-placement obstacles
+			const obstaclePoints: [number, number][] = [
+				...clusterContours.flatMap((c) => c.boundaryPoints),
+				...bridgeContours.flatMap((b) => b.boundaryPoints),
+			];
+
+			// Labels are not rendered until placeDiscLabels completes its 300 ticks
+			discLabels = placeDiscLabels(buildRawDiscLabels(nodes), nodes, w, h, obstaclePoints);
 		}
 	}
 
 	function nodeColor(node: EulerNode): string {
-		return clusterColorForDiscipline(node.publication.disciplines[0] ?? '');
+		return getDotColor(node.publication);
 	}
 
 	onMount(() => {
