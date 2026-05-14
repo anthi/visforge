@@ -127,6 +127,21 @@
 		return getDotColor(node.publication);
 	}
 
+	/** Split label at nearest-midpoint word boundary. Returns [line1, line2]. */
+	function splitLabel(label: string): [string, string] {
+		const mid = Math.floor(label.length / 2);
+		const spacesBefore = [];
+		const spacesAfter = [];
+		for (let i = mid; i >= 0; i--) if (label[i] === ' ') { spacesBefore.push(i); break; }
+		for (let i = mid + 1; i < label.length; i++) if (label[i] === ' ') { spacesAfter.push(i); break; }
+		const candidates = [...spacesBefore, ...spacesAfter];
+		if (candidates.length === 0) return [label.slice(0, mid), label.slice(mid)];
+		const split = candidates.reduce((a, b) =>
+			Math.abs(a - mid) <= Math.abs(b - mid) ? a : b
+		);
+		return [label.slice(0, split), label.slice(split + 1)];
+	}
+
 	onMount(() => {
 		const ro = new ResizeObserver(([entry]) => {
 			width = entry.contentRect.width;
@@ -216,7 +231,7 @@
 			</text>
 		{/each}
 
-		<!-- Discipline sub-labels — force-placed within cluster regions, 55% opacity -->
+		<!-- Discipline sub-labels — grid-placed within cluster regions, 55% opacity -->
 		{#each discLabels as dl}
 			<text
 				x={dl.x}
@@ -231,7 +246,13 @@
 				fill-opacity={0.55}
 				pointer-events="none"
 			>
-				{dl.label}
+				{#if dl.label.length > 12}
+					{@const [l1, l2] = splitLabel(dl.label)}
+					<tspan x={dl.x} dy="-6.5">{l1}</tspan>
+					<tspan x={dl.x} dy="13">{l2}</tspan>
+				{:else}
+					{dl.label}
+				{/if}
 			</text>
 		{/each}
 

@@ -44,7 +44,11 @@ export const CLUSTER_COLORS: Record<string, string> = {
 export function getDotColor(publication: Publication): string {
 	const primaryDiscipline = publication.disciplines[0];
 	const clusterId = CLUSTER_MAP[primaryDiscipline] ?? 'formal';
-	return CLUSTER_COLORS[clusterId];
+	const color = CLUSTER_COLORS[clusterId];
+	if (primaryDiscipline === 'information_visualization') {
+		console.log('[getDotColor] InfoVis →', color);
+	}
+	return color;
 }
 
 // ─── Cluster metadata ──────────────────────────────────────────────────────────

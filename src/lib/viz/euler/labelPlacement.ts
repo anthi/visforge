@@ -1,4 +1,3 @@
-import { forceCollide, forceSimulation, forceX, forceY } from 'd3';
 import type { EulerNode } from './eulerLayout';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -22,134 +21,102 @@ export type PlacedLabel = {
 	color: string;
 };
 
-// ─── Internal node type ───────────────────────────────────────────────────────
-
-type SimNode = {
-	id: string;
-	label: string;
-	x: number;
-	y: number;
-	vx: number;
-	vy: number;
-	fx?: number;
-	fy?: number;
-	nodeType: 'label' | 'obstacle';
-	anchorX: number;
-	anchorY: number;
-	color: string;
-	clusterCX: number;
-	clusterCY: number;
-	clusterR: number;
-};
-
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+const GRID_COLS = 20;
+const GRID_ROWS = 20;
+
 /**
- * Places discipline sub-labels using a d3-force simulation.
+ * Places discipline sub-labels using a 20×20 occupancy grid.
  *
- * All obstacles (dot positions + cluster/bridge boundary samples) are added
- * as fixed nodes. Labels are pulled toward their dot centroid via forceX/Y
- * (strength 0.3) and repelled from all obstacles and each other via
- * forceCollide (radius 40px for labels, 6px for obstacles).
- * The simulation runs 300 ticks synchronously before any rendering.
+ * Each cell accumulates: dot count + boundary sample count.
+ * For each label, we find the lowest-occupancy cell within the cluster radius
+ * that is also closest to the anchor centroid, then place the label at cell center.
+ * Placed labels increment their cell so subsequent labels avoid the same spot.
+ * Fully deterministic — no simulation.
  */
 export function placeDiscLabels(
 	rawLabels: RawDiscLabel[],
 	allNodes: EulerNode[],
-	_canvasWidth: number,
-	_canvasHeight: number,
+	canvasWidth: number,
+	canvasHeight: number,
 	obstaclePoints: [number, number][]
 ): PlacedLabel[] {
 	if (rawLabels.length === 0) return [];
 
-	// Label nodes — movable
-	const labelNodes: SimNode[] = rawLabels.map((spec) => ({
-		id: spec.id,
-		label: spec.label,
-		x: spec.anchorX,
-		y: spec.anchorY,
-		vx: 0,
-		vy: 0,
-		nodeType: 'label' as const,
-		anchorX: spec.anchorX,
-		anchorY: spec.anchorY,
-		color: spec.color,
-		clusterCX: spec.clusterCX,
-		clusterCY: spec.clusterCY,
-		clusterR: spec.clusterR,
-	}));
+	const cellW = canvasWidth / GRID_COLS;
+	const cellH = canvasHeight / GRID_ROWS;
 
-	// Dot obstacle nodes — fixed at publication positions
-	const dotObstacles: SimNode[] = allNodes.map((n, i) => ({
-		id: `dot_${i}`,
-		label: '',
-		x: n.x,
-		y: n.y,
-		fx: n.x,
-		fy: n.y,
-		vx: 0,
-		vy: 0,
-		nodeType: 'obstacle' as const,
-		anchorX: n.x,
-		anchorY: n.y,
-		color: '',
-		clusterCX: 0,
-		clusterCY: 0,
-		clusterR: 0,
-	}));
+	// Build occupancy grid from dots and boundary samples
+	const grid = new Float32Array(GRID_COLS * GRID_ROWS);
 
-	// Boundary sample obstacle nodes — fixed at sampled cluster/bridge perimeter points
-	const boundaryObstacles: SimNode[] = obstaclePoints.map((pt, i) => ({
-		id: `boundary_${i}`,
-		label: '',
-		x: pt[0],
-		y: pt[1],
-		fx: pt[0],
-		fy: pt[1],
-		vx: 0,
-		vy: 0,
-		nodeType: 'obstacle' as const,
-		anchorX: pt[0],
-		anchorY: pt[1],
-		color: '',
-		clusterCX: 0,
-		clusterCY: 0,
-		clusterR: 0,
-	}));
+	const cellOf = (x: number, y: number): number => {
+		const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(x / cellW)));
+		const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(y / cellH)));
+		return row * GRID_COLS + col;
+	};
 
-	const allSimNodes: SimNode[] = [...labelNodes, ...dotObstacles, ...boundaryObstacles];
+	for (const n of allNodes) grid[cellOf(n.x, n.y)] += 1;
+	for (const [px, py] of obstaclePoints) grid[cellOf(px, py)] += 0.5;
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const sim = forceSimulation<any>(allSimNodes)
-		// Pull labels toward their dot centroid; zero force on fixed obstacle nodes
-		.force(
-			'x',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			forceX<any>((d) => d.anchorX).strength((d: SimNode) => d.nodeType === 'label' ? 0.3 : 0)
-		)
-		.force(
-			'y',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			forceY<any>((d) => d.anchorY).strength((d: SimNode) => d.nodeType === 'label' ? 0.3 : 0)
-		)
-		// Labels repel from each other and all obstacles
-		.force(
-			'collide',
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			forceCollide<any>((d: SimNode) => d.nodeType === 'label' ? 40 : 6)
-				.strength(1.0)
-				.iterations(3)
-		)
-		.stop();
+	// Cell center coordinates
+	const cellCX = (col: number) => (col + 0.5) * cellW;
+	const cellCY = (row: number) => (row + 0.5) * cellH;
 
-	// Run all ticks synchronously — labels are not rendered until this completes
-	for (let i = 0; i < 300; i++) sim.tick();
+	const placed: PlacedLabel[] = [];
 
-	return labelNodes.map((n) => ({
-		id: n.id,
-		label: n.label,
-		x: n.x,
-		y: n.y,
-		color: n.color,
-	}));
+	for (const spec of rawLabels) {
+		const { anchorX, anchorY, clusterCX, clusterCY, clusterR } = spec;
+
+		// Search all cells within cluster radius; pick lowest-occupancy + nearest anchor
+		let bestIdx = -1;
+		let bestScore = Infinity;
+
+		for (let row = 0; row < GRID_ROWS; row++) {
+			for (let col = 0; col < GRID_COLS; col++) {
+				const cx = cellCX(col);
+				const cy = cellCY(row);
+
+				// Must be within cluster radius
+				const dCluster = Math.sqrt((cx - clusterCX) ** 2 + (cy - clusterCY) ** 2);
+				if (dCluster > clusterR) continue;
+
+				const idx = row * GRID_COLS + col;
+				const occupancy = grid[idx];
+				const dAnchor = Math.sqrt((cx - anchorX) ** 2 + (cy - anchorY) ** 2);
+
+				// Score: occupancy weighted heavily, tie-broken by anchor distance
+				const score = occupancy * 1000 + dAnchor;
+				if (score < bestScore) {
+					bestScore = score;
+					bestIdx = idx;
+				}
+			}
+		}
+
+		// Fallback to anchor if no cell found inside cluster radius
+		let x = anchorX;
+		let y = anchorY;
+
+		if (bestIdx >= 0) {
+			const bestCol = bestIdx % GRID_COLS;
+			const bestRow = Math.floor(bestIdx / GRID_COLS);
+			x = cellCX(bestCol);
+			y = cellCY(bestRow);
+			// Mark cell as occupied so next labels avoid it (label footprint ~ 2×2 cells)
+			for (let dr = -1; dr <= 1; dr++) {
+				for (let dc = -1; dc <= 1; dc++) {
+					const r = bestRow + dr;
+					const c = bestCol + dc;
+					if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
+						grid[r * GRID_COLS + c] += 5;
+					}
+				}
+			}
+		}
+
+		placed.push({ id: spec.id, label: spec.label, x, y, color: spec.color });
+	}
+
+	return placed;
 }
