@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
-		categories,
-		categoriesById,
+		disciplines,
+		disciplinesById,
 		filteredPublications,
 		hoveredId,
 		hoveredCategoryId,
@@ -30,12 +30,12 @@
 
 	$: {
 		const pubs = $filteredPublications;
-		const cats = $categories;
+		const discs = $disciplines;
 		const w = width;
 		const h = height;
 		if (pubs.length > 0 && w > 0 && h > 0) {
-			nodes = runEulerLayout(pubs, cats, w, h);
-			hulls = computeHulls(nodes, cats.map((c) => c.id));
+			nodes = runEulerLayout(pubs, discs, w, h);
+			hulls = computeHulls(nodes, discs.map((d) => d.id));
 		}
 	}
 
@@ -71,19 +71,19 @@
 		aria-label="Euler diagram of publications"
 	>
 		<!-- Hull fills -->
-		{#each $categories as cat}
-			{@const hull = hulls.get(cat.id)}
+		{#each $disciplines as disc}
+			{@const hull = hulls.get(disc.id)}
 			{#if hull?.path}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<path
 					d={hull.path}
-					fill={cat.color}
-					fill-opacity={$hoveredCategoryId && $hoveredCategoryId !== cat.id ? 0.03 : 0.10}
-					stroke={cat.color}
+					fill={disc.color}
+					fill-opacity={$hoveredCategoryId && $hoveredCategoryId !== disc.id ? 0.03 : 0.10}
+					stroke={disc.color}
 					stroke-width="1.5"
-					stroke-opacity={$hoveredCategoryId && $hoveredCategoryId !== cat.id ? 0.18 : 0.55}
+					stroke-opacity={$hoveredCategoryId && $hoveredCategoryId !== disc.id ? 0.18 : 0.55}
 					stroke-linejoin="round"
-					on:mouseenter={() => setHoveredCategory(cat.id)}
+					on:mouseenter={() => setHoveredCategory(disc.id)}
 					on:mouseleave={() => setHoveredCategory(null)}
 				/>
 			{/if}
@@ -91,7 +91,7 @@
 
 		<!-- Publication nodes -->
 		{#each nodes as node}
-			{@const color = publicationColor(node.publication.categories, $categoriesById)}
+			{@const color = publicationColor(node.publication.disciplines, $disciplinesById)}
 			{@const opacity = nodeOpacity(node, $hoveredId, $selectedIds, $hoveredCategoryId)}
 			{@const r = nodeRadius(node, $hoveredId, $selectedIds)}
 			{@const isSelected = $selectedIds.has(node.id)}
@@ -107,7 +107,7 @@
 				style="cursor: pointer;"
 				on:mouseenter={(e) => {
 					setHovered(node.id);
-					setHoveredCategory(node.publication.categories[0] ?? null);
+					setHoveredCategory(node.publication.disciplines[0] ?? null);
 					trackMouse(e);
 				}}
 				on:mousemove={trackMouse}
@@ -122,23 +122,23 @@
 			/>
 		{/each}
 
-		<!-- Category labels -->
-		{#each $categories as cat}
-			{@const hull = hulls.get(cat.id)}
+		<!-- Discipline labels -->
+		{#each $disciplines as disc}
+			{@const hull = hulls.get(disc.id)}
 			{#if hull?.labelAnchor}
 				<text
 					x={hull.labelAnchor[0]}
 					y={hull.labelAnchor[1]}
 					text-anchor="middle"
 					dominant-baseline="middle"
-					fill={cat.color}
+					fill={disc.color}
 					font-size="11"
 					font-family="'JetBrains Mono', 'Fira Mono', monospace"
 					letter-spacing="0.02em"
-					opacity={$hoveredCategoryId && $hoveredCategoryId !== cat.id ? 0.2 : 0.85}
+					opacity={$hoveredCategoryId && $hoveredCategoryId !== disc.id ? 0.2 : 0.85}
 					pointer-events="none"
 				>
-					{cat.label}
+					{disc.label}
 				</text>
 			{/if}
 		{/each}
@@ -158,11 +158,11 @@
 			<p class="tt-meta">
 				{[pub.year, pub.venue].filter(Boolean).join(' · ')}
 			</p>
-			<div class="tt-cats">
-				{#each pub.categories as catId}
-					{@const cat = $categoriesById.get(catId)}
-					{#if cat}
-						<span class="tt-cat" style="--c: {cat.color}">{cat.label}</span>
+			<div class="tt-tags">
+				{#each pub.disciplines as discId}
+					{@const disc = $disciplinesById.get(discId)}
+					{#if disc}
+						<span class="tt-tag" style="--c: {disc.color}">{disc.label}</span>
 					{/if}
 				{/each}
 			</div>
@@ -183,7 +183,6 @@
 		display: block;
 	}
 
-	/* ── Tooltip ── */
 	.tooltip {
 		position: absolute;
 		pointer-events: none;
@@ -224,13 +223,13 @@
 		color: #888;
 	}
 
-	.tt-cats {
+	.tt-tags {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.25rem;
 	}
 
-	.tt-cat {
+	.tt-tag {
 		font-size: 0.6rem;
 		padding: 0.15rem 0.4rem;
 		border-radius: 2px;

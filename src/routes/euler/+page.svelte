@@ -2,13 +2,13 @@
 	import EulerDiagram from '$lib/viz/euler/EulerDiagram.svelte';
 	import DetailsPanel from '$lib/viz/euler/DetailsPanel.svelte';
 	import {
-		categories,
+		disciplines,
 		filteredPublications,
-		activeCategories,
+		activeDisciplines,
 		searchQuery,
 		yearRange,
 		yearBounds,
-		toggleCategory,
+		toggleDiscipline,
 		clearFilters
 	} from '$lib/stores';
 </script>
@@ -31,16 +31,16 @@
 		</section>
 
 		<section>
-			<p class="section-label">Categories</p>
-			<div class="category-list">
-				{#each $categories as cat}
+			<p class="section-label">Disciplines</p>
+			<div class="chip-list">
+				{#each $disciplines as disc}
 					<button
-						class="cat-chip"
-						class:active={$activeCategories.has(cat.id)}
-						style="--color: {cat.color}"
-						onclick={() => toggleCategory(cat.id)}
+						class="chip"
+						class:active={$activeDisciplines.has(disc.id)}
+						style="--color: {disc.color}"
+						onclick={() => toggleDiscipline(disc.id)}
 					>
-						{cat.label}
+						{disc.label}
 					</button>
 				{/each}
 			</div>
@@ -139,13 +139,13 @@
 		border-color: #aaa;
 	}
 
-	.category-list {
+	.chip-list {
 		display: flex;
 		flex-direction: column;
 		gap: 0.3rem;
 	}
 
-	.cat-chip {
+	.chip {
 		font-family: inherit;
 		font-size: 0.72rem;
 		padding: 0.28rem 0.55rem;
@@ -158,7 +158,7 @@
 		transition: background 0.12s, color 0.12s;
 	}
 
-	.cat-chip.active {
+	.chip.active {
 		background: var(--color);
 		color: #fff;
 	}

@@ -1,11 +1,24 @@
-export { publications, categories, publicationsById, categoriesById } from './entities';
 export {
-	activeCategories,
+	publications,
+	disciplines,
+	subfields,
+	domains,
+	publicationsById,
+	disciplinesById,
+	subfieldsById,
+	domainsById
+} from './entities';
+export {
+	activeDisciplines,
+	activeSubfields,
+	activeDomains,
 	searchQuery,
 	yearRange,
 	yearBounds,
 	filteredPublications,
-	toggleCategory,
+	toggleDiscipline,
+	toggleSubfield,
+	toggleDomain,
 	clearFilters
 } from './filters';
 export {

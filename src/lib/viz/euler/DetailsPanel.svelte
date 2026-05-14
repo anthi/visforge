@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { categoriesById, clearSelection, selectedPublications } from '$lib/stores';
+	import { disciplinesById, subfieldsById, domainsById, clearSelection, selectedPublications } from '$lib/stores';
 
 	$: pub = $selectedPublications[0] ?? null;
 </script>
@@ -19,14 +19,47 @@
 				{[pub.year, pub.venue].filter(Boolean).join(' · ')}
 			</p>
 
-			<div class="cats">
-				{#each pub.categories as catId}
-					{@const cat = $categoriesById.get(catId)}
-					{#if cat}
-						<span class="cat-badge" style="--c: {cat.color}">{cat.label}</span>
-					{/if}
-				{/each}
-			</div>
+			{#if pub.disciplines.length > 0}
+				<div class="tag-section">
+					<span class="tag-label">Disciplines</span>
+					<div class="tags">
+						{#each pub.disciplines as id}
+							{@const entry = $disciplinesById.get(id)}
+							{#if entry}
+								<span class="tag" style="--c: {entry.color}">{entry.label}</span>
+							{/if}
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			{#if pub.subfields.length > 0}
+				<div class="tag-section">
+					<span class="tag-label">Subfields</span>
+					<div class="tags">
+						{#each pub.subfields as id}
+							{@const entry = $subfieldsById.get(id)}
+							{#if entry}
+								<span class="tag" style="--c: {entry.color}">{entry.label}</span>
+							{/if}
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			{#if pub.domains.length > 0}
+				<div class="tag-section">
+					<span class="tag-label">Domains</span>
+					<div class="tags">
+						{#each pub.domains as id}
+							{@const entry = $domainsById.get(id)}
+							{#if entry}
+								<span class="tag" style="--c: {entry.color}">{entry.label}</span>
+							{/if}
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			{#if pub.abstract}
 				<p class="abstract">{pub.abstract}</p>
@@ -97,9 +130,7 @@
 		font-family: inherit;
 	}
 
-	.close:hover {
-		color: #444;
-	}
+	.close:hover { color: #444; }
 
 	.scroll {
 		padding: 1.1rem 1rem 1.2rem;
@@ -132,13 +163,26 @@
 		color: #888;
 	}
 
-	.cats {
+	.tag-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.tag-label {
+		font-size: 0.6rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: #aaa;
+	}
+
+	.tags {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.3rem;
 	}
 
-	.cat-badge {
+	.tag {
 		font-size: 0.62rem;
 		padding: 0.18rem 0.45rem;
 		border-radius: 2px;

@@ -1,7 +1,7 @@
 import { forceCollide, forceManyBody, forceSimulation } from 'd3';
 import type { SimulationNodeDatum } from 'd3';
 import type { Publication } from '$lib/models/publication';
-import type { Category } from '$lib/models/category';
+import type { TaxonomyEntry } from '$lib/models/taxonomy';
 
 export type EulerNode = {
 	id: string;
@@ -10,30 +10,38 @@ export type EulerNode = {
 	y: number;
 };
 
-// Internal D3 simulation node — extends SimulationNodeDatum so D3 can mutate x/y/vx/vy
 type SimNode = SimulationNodeDatum & { publication: Publication };
 
-// Normalized seed positions reflecting intellectual proximity.
-// Coordinates are in the unit square centered at origin; scaled at runtime.
+// Seed positions for all 16 disciplines — unit square, scaled at runtime.
+// Arrangement encodes intellectual proximity: psychology/cog-sci center-right,
+// quantitative fields (stats/math/OR) bottom-right, social sciences left, etc.
 const SEED: Record<string, [number, number]> = {
-	infovis: [0.0, -1.0],
-	hci: [-0.75, -0.45],
-	'feminist-hci': [-1.0, 0.35],
-	xai: [0.6, -0.45],
-	'cognitive-bias': [0.85, 0.1],
-	'decision-making': [0.3, 0.75],
-	jdm: [0.85, 0.75],
-	'behavioral-economics': [0.15, 1.1]
+	information_visualization: [0.0, -1.1],
+	hci:                       [-0.65, -0.85],
+	artificial_intelligence:   [0.65, -0.85],
+	computer_science:          [0.9, -0.5],
+	cognitive_science:         [0.5, -0.1],
+	psychology:                [0.9, 0.3],
+	neuroscience:              [0.65, 0.85],
+	economics:                 [-0.5, 0.9],
+	mathematics:               [0.1, 1.1],
+	statistics:                [0.5, 1.1],
+	operations_research:       [-0.1, 1.0],
+	management_science:        [-0.85, 0.55],
+	philosophy:                [-0.9, -0.1],
+	political_science:         [-1.05, 0.35],
+	sociology:                 [-0.95, 0.75],
+	anthropology:              [-0.75, 0.9]
 };
 
-const CLUSTER_RADIUS = 210; // px — distance of category centers from canvas center
-const NODE_RADIUS = 5; // px — collision radius
-const ALPHA_CLUSTER = 0.28; // cluster force strength per alpha unit
+const CLUSTER_RADIUS = 240;
+const NODE_RADIUS = 5;
+const ALPHA_CLUSTER = 0.28;
 const TICKS = 320;
 
 export function runEulerLayout(
 	publications: Publication[],
-	_categories: Category[],
+	_disciplines: TaxonomyEntry[],
 	width: number,
 	height: number
 ): EulerNode[] {
@@ -41,8 +49,7 @@ export function runEulerLayout(
 	const cy = height / 2;
 
 	const simNodes: SimNode[] = publications.map((pub) => {
-		// Start each node at the mean seed position of its categories
-		const seeds = pub.categories.map((c) => SEED[c]).filter(Boolean) as [number, number][];
+		const seeds = pub.disciplines.map((d) => SEED[d]).filter(Boolean) as [number, number][];
 		const sx = seeds.length ? seeds.reduce((s, p) => s + p[0], 0) / seeds.length : 0;
 		const sy = seeds.length ? seeds.reduce((s, p) => s + p[1], 0) / seeds.length : 0;
 		return {
@@ -68,14 +75,13 @@ export function runEulerLayout(
 	}));
 }
 
-// Custom force: pulls each node toward the center(s) of its category seed(s)
 function clusterForce(cx: number, cy: number) {
 	let nodes: SimNode[] = [];
 
 	const force = (alpha: number): void => {
 		for (const n of nodes) {
-			for (const catId of n.publication.categories) {
-				const seed = SEED[catId];
+			for (const discId of n.publication.disciplines) {
+				const seed = SEED[discId];
 				if (!seed) continue;
 				const tx = cx + seed[0] * CLUSTER_RADIUS;
 				const ty = cy + seed[1] * CLUSTER_RADIUS;
@@ -85,7 +91,6 @@ function clusterForce(cx: number, cy: number) {
 		}
 	};
 
-	// D3 calls initialize() with the node array before the first tick
 	(force as typeof force & { initialize: (ns: SimNode[]) => void }).initialize = (
 		ns: SimNode[]
 	) => {

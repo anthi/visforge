@@ -1,9 +1,9 @@
-import type { Category } from '$lib/models/category';
+import type { TaxonomyEntry } from '$lib/models/taxonomy';
 
 export function publicationColor(
-	categoryIds: string[],
-	categoriesById: Map<string, Category>
+	disciplineIds: string[],
+	disciplinesById: Map<string, TaxonomyEntry>
 ): string {
-	const cat = categoriesById.get(categoryIds[0]);
-	return cat?.color ?? '#888888';
+	const disc = disciplinesById.get(disciplineIds[0]);
+	return disc?.color ?? '#888888';
 }

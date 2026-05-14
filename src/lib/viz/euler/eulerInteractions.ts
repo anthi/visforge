@@ -6,11 +6,9 @@ export function nodeOpacity(
 	selectedIds: Set<string>,
 	hoveredCatId: string | null
 ): number {
-	// Category highlight mode: dim everything outside the hovered category
 	if (hoveredCatId) {
-		return node.publication.categories.includes(hoveredCatId) ? 1.0 : 0.1;
+		return node.publication.disciplines.includes(hoveredCatId) ? 1.0 : 0.1;
 	}
-	// Node focus mode: full opacity for hovered/selected, partial for others
 	if (hoveredId === node.id || selectedIds.has(node.id)) return 1.0;
 	if (hoveredId !== null || selectedIds.size > 0) return 0.32;
 	return 0.72;
