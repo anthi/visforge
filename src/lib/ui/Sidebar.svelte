@@ -8,6 +8,7 @@
 		venueFilter,
 		uniqueVenues,
 		authorProminence,
+		visibleAuthors,
 		searchQuery,
 		yearRange,
 		yearBounds,
@@ -89,7 +90,11 @@
 <aside class="sidebar">
 	<header>
 		<h1>VisForge</h1>
-		<p class="subtitle">{$filteredPublications.length} publications</p>
+		{#if $currentLens === 'authors'}
+			<p class="subtitle">{$visibleAuthors.length} authors · {$filteredPublications.length} publications</p>
+		{:else}
+			<p class="subtitle">{$filteredPublications.length} publications</p>
+		{/if}
 	</header>
 
 	<!-- Lens switcher -->
@@ -160,10 +165,11 @@
 		</svg>
 	</section>
 
-	<!-- Author prominence threshold -->
+	<!-- Author prominence threshold — only relevant in Authors lens -->
+	{#if $currentLens === 'authors'}
 	<section>
 		<p class="section-label">
-			Author prominence · top {Math.round((1 - $authorProminence) * 100)}%
+			Prominence · top {Math.round((1 - $authorProminence) * 100)}%
 		</p>
 		<input
 			type="range"
@@ -173,6 +179,7 @@
 			on:input={(e) => authorProminence.set(1 - Number((e.target as HTMLInputElement).value) / 100)}
 		/>
 	</section>
+	{/if}
 
 	<!-- Venue filter -->
 	<section>

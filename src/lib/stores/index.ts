@@ -27,6 +27,7 @@ export {
 	clusterCounts,
 	authorProminence,
 	filteredPublications,
+	visibleAuthors,
 	toggleDiscipline,
 	toggleSubfield,
 	toggleDomain,

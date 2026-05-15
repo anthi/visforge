@@ -3,10 +3,18 @@ import type { SimulationNodeDatum } from 'd3';
 import type { Publication } from '$lib/models/publication';
 import type { TaxonomyEntry } from '$lib/models/taxonomy';
 import type { Lens } from '$lib/stores';
+import type { AuthorData } from '$lib/data/authors';
 
 export type EulerNode = {
 	id: string;
 	publication: Publication;
+	x: number;
+	y: number;
+};
+
+export type AuthorNode = {
+	id: string;
+	author: AuthorData;
 	x: number;
 	y: number;
 };
@@ -73,6 +81,57 @@ const ALPHA_CLUSTER = 0.28;
 const TICKS = 320;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+export function runAuthorLayout(
+	authors: AuthorData[],
+	width: number,
+	height: number
+): AuthorNode[] {
+	const cx = width / 2;
+	const cy = height / 2;
+
+	type AuthorSimNode = SimulationNodeDatum & { author: AuthorData };
+
+	const simNodes: AuthorSimNode[] = authors.map((author) => {
+		const seed = DISC_SEED[author.primaryDiscipline] ?? [0, 0];
+		return {
+			author,
+			x: cx + seed[0] * CLUSTER_RADIUS + (Math.random() - 0.5) * 40,
+			y: cy + seed[1] * CLUSTER_RADIUS + (Math.random() - 0.5) * 40,
+		};
+	});
+
+	const authorClusterForce = (() => {
+		let nodes: AuthorSimNode[] = [];
+		const force = (alpha: number) => {
+			for (const n of nodes) {
+				const seed = DISC_SEED[n.author.primaryDiscipline] ?? [0, 0];
+				const tx = cx + seed[0] * CLUSTER_RADIUS;
+				const ty = cy + seed[1] * CLUSTER_RADIUS;
+				n.vx = (n.vx ?? 0) + (tx - (n.x ?? cx)) * alpha * ALPHA_CLUSTER;
+				n.vy = (n.vy ?? 0) + (ty - (n.y ?? cy)) * alpha * ALPHA_CLUSTER;
+			}
+		};
+		(force as typeof force & { initialize: (ns: AuthorSimNode[]) => void }).initialize =
+			(ns) => { nodes = ns; };
+		return force;
+	})();
+
+	const sim = forceSimulation(simNodes)
+		.force('charge', forceManyBody().strength(-30))
+		.force('collide', forceCollide(9))
+		.force('cluster', authorClusterForce);
+
+	sim.stop();
+	for (let i = 0; i < TICKS; i++) sim.tick();
+
+	return simNodes.map((n) => ({
+		id: n.author.id,
+		author: n.author,
+		x: n.x ?? cx,
+		y: n.y ?? cy,
+	}));
+}
 
 export function runEulerLayout(
 	publications: Publication[],

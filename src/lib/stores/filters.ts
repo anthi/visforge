@@ -1,6 +1,7 @@
 import { derived, writable } from 'svelte/store';
 import { publications } from './entities';
 import { CLUSTER_MAP, CLUSTERS } from '$lib/data/clusters';
+import { deriveAuthors, allocateAuthorSlots } from '$lib/data/authors';
 
 export type YearRange = { min: number; max: number };
 export type Lens = 'disciplines' | 'subfields' | 'domains' | 'authors';
@@ -80,6 +81,12 @@ export const yearCounts = derived(publications, ($pubs) => {
 	}
 	return counts;
 });
+
+// ─── Derived: visible authors for Authors lens ────────────────────────────────
+export const visibleAuthors = derived(
+	[filteredPublications, authorProminence],
+	([$pubs, $prominence]) => allocateAuthorSlots(deriveAuthors($pubs), $prominence)
+);
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 export function toggleDiscipline(id: string): void {

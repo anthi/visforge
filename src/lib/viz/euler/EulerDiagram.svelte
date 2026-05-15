@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens } from '$lib/stores';
+	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, visibleAuthors } from '$lib/stores';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
@@ -9,7 +9,7 @@
 
 	/** Per-cluster visual opacity (0–1). Passed from page; defaults to fully opaque. */
 	export let clusterOpacities: Record<string, number> = {};
-	import { runEulerLayout, type EulerNode } from './eulerLayout';
+	import { runEulerLayout, runAuthorLayout, type EulerNode, type AuthorNode } from './eulerLayout';
 	import { computeClusterContours, computeBridgeContours, type RegionContour } from './eulerContours';
 	import { placeDiscLabels, type PlacedLabel, type RawDiscLabel } from './labelPlacement';
 
@@ -18,6 +18,7 @@
 	let height = 680;
 
 	let nodes: EulerNode[] = [];
+	let authorNodes: AuthorNode[] = [];
 	let clusterContours: RegionContour[] = [];
 	let bridgeContours: RegionContour[] = [];
 	let discLabels: PlacedLabel[] = [];
@@ -35,6 +36,12 @@
 	}
 
 	const animatedPositions = tweened<Record<string, [number, number]>>({}, {
+		duration: 300,
+		easing: cubicOut,
+		interpolate: interpPositions
+	});
+
+	const authorAnimatedPositions = tweened<Record<string, [number, number]>>({}, {
 		duration: 300,
 		easing: cubicOut,
 		interpolate: interpPositions
@@ -93,6 +100,7 @@
 		const h = height;
 		const lens = $currentLens;
 		if (pubs.length > 0 && w > 0 && h > 0) {
+			// Always run publication layout — needed for cluster contours regardless of lens
 			nodes = runEulerLayout(pubs, discs, w, h, lens);
 
 			const posMap: Record<string, [number, number]> = {};
@@ -107,12 +115,29 @@
 		}
 	}
 
+	$: {
+		const authors = $visibleAuthors;
+		const w = width;
+		const h = height;
+		const lens = $currentLens;
+		if (lens === 'authors' && authors.length > 0 && w > 0 && h > 0) {
+			authorNodes = runAuthorLayout(authors, w, h);
+			const posMap: Record<string, [number, number]> = {};
+			for (const n of authorNodes) posMap[n.id] = [n.x, n.y];
+			authorAnimatedPositions.set(posMap);
+		}
+	}
+
 	function nodeColor(node: EulerNode): string {
 		return getDotColor(node.publication);
 	}
 
 	function nodeCluster(node: EulerNode): string {
 		return disciplineToCluster.get(node.publication.disciplines[0] ?? '') ?? 'formal';
+	}
+
+	function authorColor(node: AuthorNode): string {
+		return CLUSTER_COLORS[node.author.primaryCluster] ?? '#888';
 	}
 
 	function clusterOp(id: string): number {
@@ -155,6 +180,10 @@
 	// Cluster hover badge position
 	let clusterBadgePos: { x: number; y: number; label: string } | null = null;
 
+	// Author hover state
+	let hoveredAuthorId: string | null = null;
+	let authorTooltip: { x: number; y: number; name: string; discipline: string; pubs: number } | null = null;
+
 	function handleDotEnter(e: PointerEvent, node: EulerNode) {
 		setHovered(node.id);
 		const rect = container.getBoundingClientRect();
@@ -169,15 +198,33 @@
 	}
 
 	function handleDotClick(node: EulerNode) {
-		// Record panel anchor at the dot's SVG coordinate
 		panelX = node.x;
 		panelY = node.y;
 		selectSingle(node.id);
 	}
 
+	function handleAuthorEnter(e: PointerEvent, node: AuthorNode, ax: number, ay: number) {
+		hoveredAuthorId = node.id;
+		const rect = container.getBoundingClientRect();
+		const cx = e.clientX - rect.left;
+		const cy = e.clientY - rect.top;
+		const tx = cx < width / 2 ? cx + 18 : cx - 200;
+		const ty = Math.max(8, Math.min(cy - 40, height - 80));
+		authorTooltip = {
+			x: tx, y: ty,
+			name: node.author.name,
+			discipline: node.author.primaryDiscipline.replace(/_/g, ' '),
+			pubs: node.author.pubCount
+		};
+	}
+
+	function handleAuthorLeave() {
+		hoveredAuthorId = null;
+		authorTooltip = null;
+	}
+
 	function handleClusterEnter(region: RegionContour) {
 		setHoveredCategory(region.id);
-		// Badge appears just below the cluster label
 		clusterBadgePos = {
 			x: region.labelPos[0],
 			y: region.labelPos[1] + 18,
@@ -209,6 +256,14 @@
 		containerWidth={width}
 		containerHeight={height}
 	/>
+
+	{#if authorTooltip}
+		<div class="author-tooltip" style="left:{authorTooltip.x}px; top:{authorTooltip.y}px">
+			<span class="author-tooltip-name">{authorTooltip.name}</span>
+			<span class="author-tooltip-meta">{authorTooltip.discipline} · {authorTooltip.pubs} pub{authorTooltip.pubs !== 1 ? 's' : ''}</span>
+		</div>
+	{/if}
+
 	<svg {width} {height} role="img" aria-label="Euler diagram of decision making publications">
 
 		<!-- Layer 1: Cluster region contours -->
@@ -243,38 +298,70 @@
 			/>
 		{/each}
 
-		<!-- Layer 3: Publication dots -->
-		{#each nodes as node}
-			{@const isHovered = node.id === $hoveredId}
-			{@const nc = nodeCluster(node)}
-			{@const dotOp = (() => {
-				if ($hoveredId !== null) {
-					// dot hover takes priority
-					return node.publication.disciplines[0] !== hoveredDisc ? 0.08 : 0.85;
-				}
-				if ($hoveredCategoryId !== null) {
-					// cluster hover: highlight cluster, dim others
-					return nc === $hoveredCategoryId ? 0.75 : 0.10;
-				}
-				return 0.40 * clusterOp(nc);
-			})()}
-			{@const ap = $animatedPositions[node.id]}
-			{@const ax = ap ? ap[0] : node.x}
-			{@const ay = ap ? ap[1] : node.y}
-			<circle
-				cx={ax}
-				cy={ay}
-				r={isHovered ? 6 : 4}
-				fill={nodeColor(node)}
-				fill-opacity={dotOp}
-				style="cursor:pointer"
-				on:pointerenter={(e) => handleDotEnter(e, { ...node, x: ax, y: ay })}
-				on:pointerleave={handleDotLeave}
-				on:click={() => handleDotClick({ ...node, x: ax, y: ay })}
-			/>
-		{/each}
+		{#if $currentLens !== 'authors'}
+			<!-- Layer 3: Publication dots -->
+			{#each nodes as node}
+				{@const isHovered = node.id === $hoveredId}
+				{@const nc = nodeCluster(node)}
+				{@const dotOp = (() => {
+					if ($hoveredId !== null) {
+						return node.publication.disciplines[0] !== hoveredDisc ? 0.08 : 0.85;
+					}
+					if ($hoveredCategoryId !== null) {
+						return nc === $hoveredCategoryId ? 0.75 : 0.10;
+					}
+					return 0.40 * clusterOp(nc);
+				})()}
+				{@const ap = $animatedPositions[node.id]}
+				{@const ax = ap ? ap[0] : node.x}
+				{@const ay = ap ? ap[1] : node.y}
+				<circle
+					cx={ax}
+					cy={ay}
+					r={isHovered ? 6 : 4}
+					fill={nodeColor(node)}
+					fill-opacity={dotOp}
+					style="cursor:pointer"
+					on:pointerenter={(e) => handleDotEnter(e, { ...node, x: ax, y: ay })}
+					on:pointerleave={handleDotLeave}
+					on:click={() => handleDotClick({ ...node, x: ax, y: ay })}
+				/>
+			{/each}
+		{:else}
+			<!-- Layer 3 (authors lens): Human glyphs -->
+			{#each authorNodes as node}
+				{@const ap = $authorAnimatedPositions[node.id]}
+				{@const ax = ap ? ap[0] : node.x}
+				{@const ay = ap ? ap[1] : node.y}
+				{@const color = authorColor(node)}
+				{@const isHovered = hoveredAuthorId === node.id}
+				{@const nc = node.author.primaryCluster}
+				{@const op = (() => {
+					if ($hoveredCategoryId !== null) return nc === $hoveredCategoryId ? 0.85 : 0.12;
+					return isHovered ? 0.95 : 0.60 * clusterOp(nc);
+				})()}
+				<!-- svelte-ignore a11y-interactive-supports-focus -->
+				<g
+					transform="translate({ax}, {ay})"
+					style="cursor:pointer"
+					role="button"
+					aria-label={node.author.name}
+					on:pointerenter={(e) => handleAuthorEnter(e, node, ax, ay)}
+					on:pointerleave={handleAuthorLeave}
+				>
+					<!-- head -->
+					<circle cx={0} cy={-4.5} r={2.2} fill={color} fill-opacity={op} />
+					<!-- body: rounded organic trapezoid -->
+					<path
+						d="M -2.5,-2 C -4,2 -3.5,5.5 0,5.5 C 3.5,5.5 4,2 2.5,-2 Z"
+						fill={color}
+						fill-opacity={op}
+					/>
+				</g>
+			{/each}
+		{/if}
 
-		<!-- Cluster labels — ray-cast to whitespace outside cluster boundary -->
+		<!-- Cluster labels -->
 		{#each clusterContours as region}
 			<text
 				x={region.labelPos[0]}
@@ -327,7 +414,7 @@
 			</text>
 		{/each}
 
-		<!-- Discipline sub-labels — 10px, 60% opacity, subordinate to cluster labels -->
+		<!-- Discipline sub-labels -->
 		{#each discLabels as dl}
 			{@const dlOp = clusterOp(discLabelCluster(dl.id))}
 			<text
@@ -353,6 +440,27 @@
 			</text>
 		{/each}
 
+		<!-- Author name labels (shown on hover) -->
+		{#if hoveredAuthorId && $currentLens === 'authors'}
+			{#each authorNodes.filter(n => n.id === hoveredAuthorId) as node}
+				{@const ap = $authorAnimatedPositions[node.id]}
+				{@const ax = ap ? ap[0] : node.x}
+				{@const ay = ap ? ap[1] : node.y}
+				<text
+					x={ax}
+					y={ay - 12}
+					text-anchor="middle"
+					dominant-baseline="auto"
+					fill={authorColor(node)}
+					font-size={9}
+					font-weight={500}
+					font-family="'JetBrains Mono', 'Fira Mono', monospace"
+					opacity={0.9}
+					pointer-events="none"
+				>{node.author.name}</text>
+			{/each}
+		{/if}
+
 	</svg>
 </div>
 
@@ -367,5 +475,33 @@
 
 	svg {
 		display: block;
+	}
+
+	.author-tooltip {
+		position: absolute;
+		background: rgba(255, 255, 254, 0.96);
+		border: 1px solid #e0dedd;
+		border-radius: 3px;
+		padding: 0.4rem 0.6rem;
+		pointer-events: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		max-width: 190px;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+	}
+
+	.author-tooltip-name {
+		font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: #222;
+	}
+
+	.author-tooltip-meta {
+		font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+		font-size: 0.62rem;
+		color: #888;
+		text-transform: capitalize;
 	}
 </style>
