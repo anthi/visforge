@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications } from '$lib/stores';
+	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens } from '$lib/stores';
+	import { tweened } from 'svelte/motion';
+	import { cubicOut } from 'svelte/easing';
 	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
 	import Tooltip from '$lib/ui/Tooltip.svelte';
 	import DetailsPanel from './DetailsPanel.svelte';
@@ -19,6 +21,24 @@
 	let clusterContours: RegionContour[] = [];
 	let bridgeContours: RegionContour[] = [];
 	let discLabels: PlacedLabel[] = [];
+
+	function interpPositions(a: Record<string, [number, number]>, b: Record<string, [number, number]>) {
+		return (t: number): Record<string, [number, number]> => {
+			const result: Record<string, [number, number]> = {};
+			for (const id of Object.keys(b)) {
+				const [bx, by] = b[id];
+				const [ax, ay] = a[id] ?? b[id];
+				result[id] = [ax + (bx - ax) * t, ay + (by - ay) * t];
+			}
+			return result;
+		};
+	}
+
+	const animatedPositions = tweened<Record<string, [number, number]>>({}, {
+		duration: 300,
+		easing: cubicOut,
+		interpolate: interpPositions
+	});
 
 	// ─── Discipline sub-label specs ───────────────────────────────────────────
 	const DISC_SPECS: { id: string; label: string; layer: 'discipline' | 'subfield' }[] = [
@@ -71,8 +91,14 @@
 		const discs = $disciplines;
 		const w = width;
 		const h = height;
+		const lens = $currentLens;
 		if (pubs.length > 0 && w > 0 && h > 0) {
-			nodes = runEulerLayout(pubs, discs, w, h);
+			nodes = runEulerLayout(pubs, discs, w, h, lens);
+
+			const posMap: Record<string, [number, number]> = {};
+			for (const n of nodes) posMap[n.id] = [n.x, n.y];
+			animatedPositions.set(posMap);
+
 			clusterContours = computeClusterContours(nodes, w, h);
 			bridgeContours = computeBridgeContours(nodes, w, h);
 
@@ -232,16 +258,19 @@
 				}
 				return 0.40 * clusterOp(nc);
 			})()}
+			{@const ap = $animatedPositions[node.id]}
+			{@const ax = ap ? ap[0] : node.x}
+			{@const ay = ap ? ap[1] : node.y}
 			<circle
-				cx={node.x}
-				cy={node.y}
+				cx={ax}
+				cy={ay}
 				r={isHovered ? 6 : 4}
 				fill={nodeColor(node)}
 				fill-opacity={dotOp}
 				style="cursor:pointer"
-				on:pointerenter={(e) => handleDotEnter(e, node)}
+				on:pointerenter={(e) => handleDotEnter(e, { ...node, x: ax, y: ay })}
 				on:pointerleave={handleDotLeave}
-				on:click={() => handleDotClick(node)}
+				on:click={() => handleDotClick({ ...node, x: ax, y: ay })}
 			/>
 		{/each}
 
