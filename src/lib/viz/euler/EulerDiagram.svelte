@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, visibleAuthors } from '$lib/stores';
+	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, allDerivedAuthors, visibleAuthors, searchQuery } from '$lib/stores';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
@@ -18,7 +18,8 @@
 	let height = 680;
 
 	let nodes: EulerNode[] = [];
-	let authorNodes: AuthorNode[] = [];
+	// All author nodes (full layout — stable across prominence slider changes)
+	let allAuthorNodes: AuthorNode[] = [];
 	let clusterContours: RegionContour[] = [];
 	let bridgeContours: RegionContour[] = [];
 	let discLabels: PlacedLabel[] = [];
@@ -115,18 +116,54 @@
 		}
 	}
 
+	// Author layout: uses ALL derived authors, not just visible ones.
+	// This means the prominence slider (which only changes visibleAuthors) does NOT
+	// trigger a re-layout, so positions are stable while sliding.
 	$: {
-		const authors = $visibleAuthors;
+		const authors = $allDerivedAuthors;
 		const w = width;
 		const h = height;
 		const lens = $currentLens;
 		if (lens === 'authors' && authors.length > 0 && w > 0 && h > 0) {
-			authorNodes = runAuthorLayout(authors, w, h);
+			allAuthorNodes = runAuthorLayout(authors, w, h);
 			const posMap: Record<string, [number, number]> = {};
-			for (const n of authorNodes) posMap[n.id] = [n.x, n.y];
+			for (const n of allAuthorNodes) posMap[n.id] = [n.x, n.y];
 			authorAnimatedPositions.set(posMap);
 		}
 	}
+
+	// Which author IDs are currently visible (changes with prominence slider)
+	$: visibleAuthorIds = new Set($visibleAuthors.map((a) => a.id));
+
+	// Which authors to render name labels for: top 2 per cluster by withinFieldPercentile
+	$: topLabelIds = (() => {
+		const byCluster = new Map<string, AuthorNode[]>();
+		for (const node of allAuthorNodes) {
+			if (!visibleAuthorIds.has(node.id)) continue;
+			const c = node.author.primaryCluster;
+			const g = byCluster.get(c) ?? [];
+			g.push(node);
+			byCluster.set(c, g);
+		}
+		const ids = new Set<string>();
+		for (const group of byCluster.values()) {
+			group.sort((a, b) => b.author.withinFieldPercentile - a.author.withinFieldPercentile);
+			for (const n of group.slice(0, 2)) ids.add(n.id);
+		}
+		return ids;
+	})();
+
+	// Search highlight: in authors lens, dim non-matching authors rather than filtering
+	$: highlightedAuthorIds = (() => {
+		if ($currentLens !== 'authors') return null;
+		const q = $searchQuery.trim().toLowerCase();
+		if (!q) return null;
+		const ids = new Set<string>();
+		for (const n of allAuthorNodes) {
+			if (n.author.name.toLowerCase().includes(q)) ids.add(n.id);
+		}
+		return ids.size > 0 ? ids : null;
+	})();
 
 	function nodeColor(node: EulerNode): string {
 		return getDotColor(node.publication);
@@ -328,8 +365,8 @@
 				/>
 			{/each}
 		{:else}
-			<!-- Layer 3 (authors lens): Human glyphs -->
-			{#each authorNodes as node}
+			<!-- Layer 3 (authors lens): Human glyphs — rendered from full layout, filtered by visibility -->
+			{#each allAuthorNodes.filter(n => visibleAuthorIds.has(n.id)) as node}
 				{@const ap = $authorAnimatedPositions[node.id]}
 				{@const ax = ap ? ap[0] : node.x}
 				{@const ay = ap ? ap[1] : node.y}
@@ -337,8 +374,11 @@
 				{@const isHovered = hoveredAuthorId === node.id}
 				{@const nc = node.author.primaryCluster}
 				{@const op = (() => {
-					if ($hoveredCategoryId !== null) return nc === $hoveredCategoryId ? 0.85 : 0.12;
-					return isHovered ? 0.95 : 0.60 * clusterOp(nc);
+					if (highlightedAuthorIds !== null)
+						return highlightedAuthorIds.has(node.id) ? 0.95 : 0.10;
+					if ($hoveredCategoryId !== null)
+						return nc === $hoveredCategoryId ? 0.85 : 0.12;
+					return isHovered ? 0.95 : 0.62 * clusterOp(nc);
 				})()}
 				<!-- svelte-ignore a11y-interactive-supports-focus -->
 				<g
@@ -351,13 +391,25 @@
 				>
 					<!-- head -->
 					<circle cx={0} cy={-4.5} r={2.2} fill={color} fill-opacity={op} />
-					<!-- body: rounded organic trapezoid -->
+					<!-- body -->
 					<path
 						d="M -2.5,-2 C -4,2 -3.5,5.5 0,5.5 C 3.5,5.5 4,2 2.5,-2 Z"
 						fill={color}
 						fill-opacity={op}
 					/>
 				</g>
+				<!-- Always-on name label for top 2 per cluster -->
+				{#if topLabelIds.has(node.id)}
+					<text
+						x={ax + 7}
+						y={ay + 1}
+						font-size={8.5}
+						font-family="'JetBrains Mono', 'Fira Mono', monospace"
+						fill={color}
+						fill-opacity={op * 0.85}
+						pointer-events="none"
+					>{node.author.name}</text>
+				{/if}
 			{/each}
 		{/if}
 
@@ -440,26 +492,6 @@
 			</text>
 		{/each}
 
-		<!-- Author name labels (shown on hover) -->
-		{#if hoveredAuthorId && $currentLens === 'authors'}
-			{#each authorNodes.filter(n => n.id === hoveredAuthorId) as node}
-				{@const ap = $authorAnimatedPositions[node.id]}
-				{@const ax = ap ? ap[0] : node.x}
-				{@const ay = ap ? ap[1] : node.y}
-				<text
-					x={ax}
-					y={ay - 12}
-					text-anchor="middle"
-					dominant-baseline="auto"
-					fill={authorColor(node)}
-					font-size={9}
-					font-weight={500}
-					font-family="'JetBrains Mono', 'Fira Mono', monospace"
-					opacity={0.9}
-					pointer-events="none"
-				>{node.author.name}</text>
-			{/each}
-		{/if}
 
 	</svg>
 </div>

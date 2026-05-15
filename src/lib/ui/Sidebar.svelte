@@ -6,6 +6,7 @@
 		clusterOpacities,
 		clusterCounts,
 		venueFilter,
+		toggleVenue,
 		uniqueVenues,
 		authorProminence,
 		visibleAuthors,
@@ -175,21 +176,29 @@
 			type="range"
 			class="plain-slider"
 			min="0" max="100" step="1"
-			value={Math.round($authorProminence * 100)}
+			value={Math.round((1 - $authorProminence) * 100)}
 			on:input={(e) => authorProminence.set(1 - Number((e.target as HTMLInputElement).value) / 100)}
 		/>
 	</section>
 	{/if}
 
-	<!-- Venue filter -->
+	<!-- Venue filter — checklist, multi-select -->
 	<section>
-		<p class="section-label">Venue</p>
-		<select class="venue-select" bind:value={$venueFilter}>
-			<option value="">All venues</option>
+		<p class="section-label">
+			Venue{$venueFilter.size > 0 ? ` · ${$venueFilter.size} selected` : ''}
+		</p>
+		<div class="venue-list">
 			{#each $uniqueVenues as v}
-				<option value={v}>{v}</option>
+				<label class="venue-item">
+					<input
+						type="checkbox"
+						checked={$venueFilter.has(v)}
+						on:change={() => toggleVenue(v)}
+					/>
+					<span class="venue-name">{v}</span>
+				</label>
 			{/each}
-		</select>
+		</div>
 	</section>
 
 	<!-- Search -->
@@ -340,20 +349,39 @@
 		cursor: pointer;
 	}
 
-	/* Venue select */
-	.venue-select {
-		font-family: inherit;
-		font-size: 0.72rem;
-		padding: 0.3rem 0.4rem;
-		border: 1px solid #ddd;
-		border-radius: 3px;
-		background: #fff;
-		color: #333;
-		outline: none;
-		width: 100%;
+	/* Venue checklist */
+	.venue-list {
+		max-height: 110px;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		scrollbar-width: thin;
+		scrollbar-color: #ccc transparent;
 	}
 
-	.venue-select:focus { border-color: #aaa; }
+	.venue-item {
+		display: flex;
+		align-items: baseline;
+		gap: 5px;
+		cursor: pointer;
+	}
+
+	.venue-item input[type="checkbox"] {
+		margin: 0;
+		flex-shrink: 0;
+		accent-color: #555;
+		cursor: pointer;
+	}
+
+	.venue-name {
+		font-size: 0.62rem;
+		color: #555;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		line-height: 1.5;
+	}
 
 	/* Search */
 	.search {

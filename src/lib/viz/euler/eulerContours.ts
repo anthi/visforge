@@ -162,9 +162,9 @@ function clusterLabelPosRay(
 	if (ring.length === 0) return [width / 2, 24];
 
 	const [ocx, ocy] = polygonCentroid(ring);
-	const N_RAYS = 16;
+	const N_RAYS = 24;
 	const STEP = 4;
-	const OVERSHOOT = 60;
+	const OVERSHOOT = 96;
 	const MARGIN = 24;
 
 	let bestPos: [number, number] = [Math.max(MARGIN, Math.min(width - MARGIN, ocx)), MARGIN];

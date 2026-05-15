@@ -80,6 +80,15 @@ const NODE_RADIUS = 5;
 const ALPHA_CLUSTER = 0.28;
 const TICKS = 320;
 
+// ─── Deterministic jitter (stable across re-renders for the same author) ─────
+
+function stableJitter(s: string): [number, number] {
+	let h = 0;
+	for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+	const u = Math.abs(h);
+	return [((u % 1000) / 1000 - 0.5) * 40, (((u >> 10) % 1000) / 1000 - 0.5) * 40];
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export function runAuthorLayout(
@@ -94,10 +103,11 @@ export function runAuthorLayout(
 
 	const simNodes: AuthorSimNode[] = authors.map((author) => {
 		const seed = DISC_SEED[author.primaryDiscipline] ?? [0, 0];
+		const [jx, jy] = stableJitter(author.id);
 		return {
 			author,
-			x: cx + seed[0] * CLUSTER_RADIUS + (Math.random() - 0.5) * 40,
-			y: cy + seed[1] * CLUSTER_RADIUS + (Math.random() - 0.5) * 40,
+			x: cx + seed[0] * CLUSTER_RADIUS + jx,
+			y: cy + seed[1] * CLUSTER_RADIUS + jy,
 		};
 	});
 
@@ -152,10 +162,11 @@ export function runEulerLayout(
 		const seeds = lensSeeds(pub, lens, seedMap);
 		const sx = seeds.length ? seeds.reduce((s, p) => s + p[0], 0) / seeds.length : 0;
 		const sy = seeds.length ? seeds.reduce((s, p) => s + p[1], 0) / seeds.length : 0;
+		const [jx, jy] = stableJitter(pub.id);
 		return {
 			publication: pub,
-			x: cx + sx * CLUSTER_RADIUS + (Math.random() - 0.5) * 24,
-			y: cy + sy * CLUSTER_RADIUS + (Math.random() - 0.5) * 24
+			x: cx + sx * CLUSTER_RADIUS + jx * 0.6,
+			y: cy + sy * CLUSTER_RADIUS + jy * 0.6
 		};
 	});
 

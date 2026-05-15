@@ -2,6 +2,7 @@ import { derived, writable } from 'svelte/store';
 import { publications } from './entities';
 import { CLUSTER_MAP, CLUSTERS } from '$lib/data/clusters';
 import { deriveAuthors, allocateAuthorSlots } from '$lib/data/authors';
+export type { AuthorData } from '$lib/data/authors';
 
 export type YearRange = { min: number; max: number };
 export type Lens = 'disciplines' | 'subfields' | 'domains' | 'authors';
@@ -20,7 +21,7 @@ export const activeSubfields = writable<Set<string>>(new Set());
 export const activeDomains = writable<Set<string>>(new Set());
 export const searchQuery = writable<string>('');
 export const yearRange = writable<YearRange>({ min: 1944, max: 2030 });
-export const venueFilter = writable<string>('');
+export const venueFilter = writable<Set<string>>(new Set());
 
 // ─── UI / visual state (not filters — do not affect filteredPublications) ─────
 export const currentLens = writable<Lens>('disciplines');
@@ -42,17 +43,20 @@ export const uniqueVenues = derived(publications, ($pubs) => {
 });
 
 // ─── Derived: filtered publications ──────────────────────────────────────────
+// In the 'authors' lens, text search is used only for highlighting — not filtering —
+// so the full author set stays visible and the search narrows within it.
 export const filteredPublications = derived(
-	[publications, activeDisciplines, activeSubfields, activeDomains, searchQuery, yearRange, venueFilter],
-	([$pubs, $discs, $subs, $doms, $query, $range, $venue]) => {
+	[publications, activeDisciplines, activeSubfields, activeDomains, searchQuery, yearRange, venueFilter, currentLens],
+	([$pubs, $discs, $subs, $doms, $query, $range, $venue, $lens]) => {
 		const q = $query.trim().toLowerCase();
 		return $pubs.filter((p) => {
 			if ($discs.size > 0 && !p.disciplines.some((d) => $discs.has(d))) return false;
 			if ($subs.size > 0 && !p.subfields.some((s) => $subs.has(s))) return false;
 			if ($doms.size > 0 && !p.domains.some((d) => $doms.has(d))) return false;
 			if (p.year !== undefined && (p.year < $range.min || p.year > $range.max)) return false;
-			if ($venue && p.venue !== $venue) return false;
-			if (q) {
+			if ($venue.size > 0 && (!p.venue || !$venue.has(p.venue))) return false;
+			// Text search is a highlight in authors lens, not a filter
+			if (q && $lens !== 'authors') {
 				const inTitle = p.title.toLowerCase().includes(q);
 				const inAuthors = p.authors.some((a) => a.name.toLowerCase().includes(q));
 				const inKeywords = p.keywords?.some((k) => k.toLowerCase().includes(q)) ?? false;
@@ -82,10 +86,16 @@ export const yearCounts = derived(publications, ($pubs) => {
 	return counts;
 });
 
-// ─── Derived: visible authors for Authors lens ────────────────────────────────
+// ─── Derived: authors for Authors lens ───────────────────────────────────────
+// allDerivedAuthors: full author set for layout (changes only with pubs/filters)
+export const allDerivedAuthors = derived(
+	filteredPublications,
+	($pubs) => deriveAuthors($pubs)
+);
+// visibleAuthors: slot-allocated subset (changes with prominence slider)
 export const visibleAuthors = derived(
-	[filteredPublications, authorProminence],
-	([$pubs, $prominence]) => allocateAuthorSlots(deriveAuthors($pubs), $prominence)
+	[allDerivedAuthors, authorProminence],
+	([$authors, $prominence]) => allocateAuthorSlots($authors, $prominence)
 );
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -113,11 +123,19 @@ export function toggleDomain(id: string): void {
 	});
 }
 
+export function toggleVenue(venue: string): void {
+	venueFilter.update((prev) => {
+		const next = new Set(prev);
+		next.has(venue) ? next.delete(venue) : next.add(venue);
+		return next;
+	});
+}
+
 export function clearFilters(): void {
 	activeDisciplines.set(new Set());
 	activeSubfields.set(new Set());
 	activeDomains.set(new Set());
 	searchQuery.set('');
-	venueFilter.set('');
+	venueFilter.set(new Set());
 	yearBounds.subscribe((bounds) => yearRange.set({ ...bounds }))();
 }
