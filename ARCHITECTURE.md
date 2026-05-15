@@ -74,47 +74,39 @@ Standard Euler libraries (venn.js, eulerr) are rejected:
 src/
   lib/
     data/
-      publications/
-      parsers/
       mock/
+        publications.ts
+      authors.ts
+      clusters.ts
+      taxonomy.ts
     models/
       publication.ts
-      category.ts
       author.ts
     stores/
       entities.ts
       filters.ts
       interactions.ts
+      index.ts
+      lens.ts
     viz/
       core/
-        visualization.ts
-        interactions.ts
         geometry.ts
-        colors.ts
+        interactions.ts
       euler/
         EulerDiagram.svelte
+        DetailsPanel.svelte
         eulerLayout.ts
+        eulerContours.ts
         eulerGeometry.ts
         eulerInteractions.ts
-      network/
-        NetworkDiagram.svelte
-      scatterplot/
-        Scatterplot.svelte
-      table/
-        PublicationTable.svelte
+        labelPlacement.ts
     ui/
       Sidebar.svelte
-      SearchPanel.svelte
-      MetadataPanel.svelte
-      FiltersPanel.svelte
       Tooltip.svelte
   routes/
     +layout.svelte
+    +layout.ts
     +page.svelte
-    euler/
-    network/
-    scatterplot/
-    table/
 ```
 
 ---

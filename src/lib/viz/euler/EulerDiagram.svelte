@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import * as d3 from 'd3';
 	import { filteredPublications, fields, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, allDerivedAuthors, visibleAuthors, searchQuery } from '$lib/stores';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
@@ -221,6 +222,49 @@
 	let hoveredAuthorId: string | null = null;
 	let authorTooltip: { x: number; y: number; name: string; field: string; pubs: number } | null = null;
 
+	// Author selection state (for cluster-context greyout in authors lens)
+	let selectedAuthorId: string | null = null;
+
+	// Map: author id → set of cluster ids they touch
+	$: authorClusterMap = (() => {
+		const m = new Map<string, Set<string>>();
+		for (const n of allAuthorNodes) m.set(n.id, new Set(n.author.clusters));
+		return m;
+	})();
+
+	// Set of author ids that share at least one cluster with the selected author
+	$: selectedAuthorClusterPeers = (() => {
+		if (!selectedAuthorId) return null;
+		const sel = authorClusterMap.get(selectedAuthorId);
+		if (!sel) return null;
+		const peers = new Set<string>();
+		for (const [id, clusters] of authorClusterMap) {
+			for (const c of clusters) {
+				if (sel.has(c)) { peers.add(id); break; }
+			}
+		}
+		return peers;
+	})();
+
+	function handleAuthorClick(node: AuthorNode) {
+		if (selectedAuthorId === node.id) {
+			selectedAuthorId = null;
+		} else {
+			selectedAuthorId = node.id;
+		}
+	}
+
+	function handleBackgroundClick() {
+		selectedAuthorId = null;
+	}
+
+	// ─── Zoom ────────────────────────────────────────────────────────────────
+	let svgEl: SVGSVGElement;
+	let zoomTransform = 'translate(0,0) scale(1)';
+	let zoomScale = 1;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let zoomBehavior: any = null;
+
 	function handleDotEnter(e: PointerEvent, node: EulerNode) {
 		setHovered(node.id);
 		const rect = container.getBoundingClientRect();
@@ -280,8 +324,35 @@
 			height = entry.contentRect.height;
 		});
 		ro.observe(container);
+
+		// D3 zoom on the SVG, transform applied to <g id="zoom-root">
+		if (svgEl) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			zoomBehavior = (d3.zoom() as any)
+				.scaleExtent([0.4, 6])
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				.on('zoom', (event: any) => {
+					const t = event.transform;
+					zoomTransform = `translate(${t.x},${t.y}) scale(${t.k})`;
+					zoomScale = t.k;
+				});
+			d3.select(svgEl).call(zoomBehavior);
+		}
+
 		return () => ro.disconnect();
 	});
+
+	function resetZoom() {
+		if (!svgEl || !zoomBehavior) return;
+		d3.select(svgEl)
+			.transition()
+			.duration(300)
+			.call(zoomBehavior.transform, d3.zoomIdentity);
+	}
+
+	function truncate(s: string, n: number): string {
+		return s.length > n ? s.slice(0, n - 1) + '…' : s;
+	}
 </script>
 
 <div class="euler-container" bind:this={container}>
@@ -301,7 +372,17 @@
 		</div>
 	{/if}
 
-	<svg {width} {height} role="img" aria-label="Euler diagram of decision making publications">
+	<button class="reset-zoom" on:click={resetZoom} title="Reset zoom">⊙ reset</button>
+
+	<svg
+		bind:this={svgEl}
+		{width}
+		{height}
+		role="img"
+		aria-label="Euler diagram of decision making publications"
+		on:click={handleBackgroundClick}
+	>
+		<g id="zoom-root" transform={zoomTransform}>
 
 		<!-- Layer 1: Cluster region contours -->
 		{#each clusterContours as region}
@@ -352,17 +433,40 @@
 				{@const ap = $animatedPositions[node.id]}
 				{@const ax = ap ? ap[0] : node.x}
 				{@const ay = ap ? ap[1] : node.y}
+				{@const baseR = zoomScale > 3 ? 10 : zoomScale > 1.5 ? 8 : 4}
 				<circle
 					cx={ax}
 					cy={ay}
-					r={isHovered ? 6 : 4}
+					r={isHovered ? baseR + 2 : baseR}
 					fill={nodeColor(node)}
 					fill-opacity={dotOp}
 					style="cursor:pointer"
 					on:pointerenter={(e) => handleDotEnter(e, { ...node, x: ax, y: ay })}
 					on:pointerleave={handleDotLeave}
-					on:click={() => handleDotClick({ ...node, x: ax, y: ay })}
+					on:click|stopPropagation={() => handleDotClick({ ...node, x: ax, y: ay })}
 				/>
+				{#if zoomScale > 1.5}
+					<text
+						x={ax + baseR + 3}
+						y={ay - baseR - 2}
+						font-size={zoomScale > 3 ? 9 : 8}
+						font-family="'JetBrains Mono', 'Fira Mono', monospace"
+						fill={nodeColor(node)}
+						fill-opacity={0.85}
+						pointer-events="none"
+					>{(node.publication.fields[0] ?? '').replace(/_/g, ' ')}</text>
+				{/if}
+				{#if zoomScale > 3}
+					<text
+						x={ax + baseR + 3}
+						y={ay + 4}
+						font-size={9}
+						font-family="'JetBrains Mono', 'Fira Mono', monospace"
+						fill="#333"
+						fill-opacity={0.9}
+						pointer-events="none"
+					>{truncate(node.publication.title, 30)}</text>
+				{/if}
 			{/each}
 		{:else}
 			<!-- Layer 3 (authors lens): Human glyphs — rendered from full layout, filtered by visibility -->
@@ -373,7 +477,10 @@
 				{@const color = authorColor(node)}
 				{@const isHovered = hoveredAuthorId === node.id}
 				{@const nc = node.author.primaryCluster}
+				{@const isSelected = selectedAuthorId === node.id}
 				{@const op = (() => {
+					if (selectedAuthorClusterPeers !== null)
+						return selectedAuthorClusterPeers.has(node.id) ? 0.95 : 0.15;
 					if (highlightedAuthorIds !== null)
 						return highlightedAuthorIds.has(node.id) ? 0.95 : 0.10;
 					if ($hoveredCategoryId !== null)
@@ -388,7 +495,12 @@
 					aria-label={node.author.name}
 					on:pointerenter={(e) => handleAuthorEnter(e, node, ax, ay)}
 					on:pointerleave={handleAuthorLeave}
+					on:click|stopPropagation={() => handleAuthorClick(node)}
 				>
+					<!-- selection ring -->
+					{#if isSelected}
+						<circle cx={0} cy={0} r={6.8} fill="none" stroke="#ffffff" stroke-width={1.5} />
+					{/if}
 					<!-- head -->
 					<circle cx={0} cy={-4.5} r={2.2} fill={color} fill-opacity={op} />
 					<!-- body -->
@@ -492,7 +604,7 @@
 			</text>
 		{/each}
 
-
+		</g>
 	</svg>
 </div>
 
@@ -535,5 +647,25 @@
 		font-size: 0.62rem;
 		color: #888;
 		text-transform: capitalize;
+	}
+
+	.reset-zoom {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		z-index: 10;
+		background: rgba(255, 255, 254, 0.92);
+		border: 1px solid #d8d6d4;
+		border-radius: 3px;
+		padding: 0.25rem 0.5rem;
+		font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+		font-size: 0.68rem;
+		color: #444;
+		cursor: pointer;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+	}
+	.reset-zoom:hover {
+		background: #fff;
+		color: #111;
 	}
 </style>

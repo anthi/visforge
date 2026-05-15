@@ -8,7 +8,54 @@ export type AuthorData = {
 	primaryCluster: string;
 	pubCount: number;
 	withinFieldPercentile: number; // 0 = least prominent in field, 1 = most prominent
+	isFoundational: boolean;
+	/** All distinct cluster ids the author has touched (via any pub's primary field). */
+	clusters: string[];
+	/** Fraction of the author's publications that have at least one field tagged. 0–1. */
+	topicalConsistency: number;
+	/** Career span within dataset (maxYear − minYear) / dataset span. 0–1. */
+	temporalSpread: number;
+	/** Count of distinct fields across all the author's publications / 17. 0–1. */
+	crossFieldPresence: number;
 };
+
+/** Canonical figures whose author glyph must remain visible regardless of prominence threshold. */
+const FOUNDATIONAL_IDS = new Set<string>([
+	'simon',
+	'kahneman',
+	'tversky',
+	'klein',
+	'savage',
+	'thaler',
+	'sunstein',
+	'von neumann',
+	'nash',
+	'munzner',
+	'shneiderman',
+	'norman',
+	'russell',
+	'pearl',
+	'ackoff',
+	'keeney',
+	'raiffa',
+	'dimara'
+]);
+
+/** Total number of fields in the taxonomy — used to normalize crossFieldPresence. */
+const TOTAL_FIELDS = 17;
+
+function isFoundationalName(normalized: string): boolean {
+	if (FOUNDATIONAL_IDS.has(normalized)) return true;
+	// Match by last-name token (e.g. "daniel kahneman" → "kahneman")
+	const parts = normalized.split(/\s+/);
+	const last = parts[parts.length - 1];
+	if (FOUNDATIONAL_IDS.has(last)) return true;
+	// Match multi-word foundational names ("von neumann") appearing anywhere
+	for (const f of FOUNDATIONAL_IDS) {
+		if (f.includes(' ') && normalized.includes(f)) return true;
+	}
+	return false;
+}
 
 export function deriveAuthors(publications: Publication[]): AuthorData[] {
 	const authorMap = new Map<string, {
@@ -31,10 +78,46 @@ export function deriveAuthors(publications: Publication[]): AuthorData[] {
 		}
 	}
 
+	// Dataset-wide year bounds for temporalSpread normalization
+	let datasetMinYear = Infinity;
+	let datasetMaxYear = -Infinity;
+	for (const p of publications) {
+		if (p.year !== undefined) {
+			if (p.year < datasetMinYear) datasetMinYear = p.year;
+			if (p.year > datasetMaxYear) datasetMaxYear = p.year;
+		}
+	}
+	const datasetSpan = Math.max(1, datasetMaxYear - datasetMinYear);
+
 	const authors: AuthorData[] = [];
 	for (const [id, { name, pubs, fieldCounts }] of authorMap) {
 		const primaryField =
 			[...fieldCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'psychology';
+
+		// All clusters touched by this author (via primary field of each pub)
+		const clusterSet = new Set<string>();
+		for (const p of pubs) {
+			const cluster = CLUSTER_MAP[p.fields[0] ?? ''] ?? 'formal';
+			clusterSet.add(cluster);
+		}
+
+		// topicalConsistency — fraction of pubs with at least one tagged field
+		const tagged = pubs.filter((p) => p.fields.length > 0).length;
+		const topicalConsistency = pubs.length > 0 ? tagged / pubs.length : 0;
+
+		// temporalSpread
+		const years = pubs.map((p) => p.year).filter((y): y is number => y !== undefined);
+		let temporalSpread = 0;
+		if (years.length > 1) {
+			const minY = Math.min(...years);
+			const maxY = Math.max(...years);
+			temporalSpread = (maxY - minY) / datasetSpan;
+		}
+
+		// crossFieldPresence — distinct fields / total fields
+		const crossFieldPresence = fieldCounts.size / TOTAL_FIELDS;
+
+		const normalized = id; // already lowercased + trimmed
 		authors.push({
 			id,
 			name,
@@ -42,6 +125,11 @@ export function deriveAuthors(publications: Publication[]): AuthorData[] {
 			primaryCluster: CLUSTER_MAP[primaryField] ?? 'mind',
 			pubCount: pubs.length,
 			withinFieldPercentile: 0, // filled below
+			isFoundational: isFoundationalName(normalized),
+			clusters: [...clusterSet],
+			topicalConsistency,
+			temporalSpread: Math.max(0, Math.min(1, temporalSpread)),
+			crossFieldPresence: Math.max(0, Math.min(1, crossFieldPresence)),
 		});
 	}
 
@@ -69,6 +157,8 @@ export function deriveAuthors(publications: Publication[]): AuthorData[] {
  * The floor guarantees every field shows at least 1 author.
  * sqrt dampens dominance of high-volume fields without fully flattening them.
  * prominenceThreshold: 0 = show all, approaching 1 = show only the most prominent.
+ *
+ * Foundational authors are always included regardless of prominence threshold.
  */
 export function allocateAuthorSlots(
 	authors: AuthorData[],
@@ -99,12 +189,29 @@ export function allocateAuthorSlots(
 	}
 	const sqrtSum = [...discPubCounts.values()].reduce((s, c) => s + Math.sqrt(c), 0) || 1;
 
+	// Always include foundational authors first
 	const result: AuthorData[] = [];
+	const includedIds = new Set<string>();
+	for (const a of authors) {
+		if (a.isFoundational) {
+			result.push(a);
+			includedIds.add(a.id);
+		}
+	}
+
+	// Fill remaining slots per field with non-foundational authors by percentile
 	for (const [field, group] of byField) {
 		const w = Math.sqrt(discPubCounts.get(field) ?? 1) / sqrtSum;
 		const slots = 1 + Math.round(remainder * w);
-		const sorted = [...group].sort((a, b) => b.withinFieldPercentile - a.withinFieldPercentile);
-		result.push(...sorted.slice(0, slots));
+		const nonFoundational = group
+			.filter((a) => !includedIds.has(a.id))
+			.sort((a, b) => b.withinFieldPercentile - a.withinFieldPercentile);
+		const alreadyFromField = group.filter((a) => includedIds.has(a.id)).length;
+		const remainingSlots = Math.max(0, slots - alreadyFromField);
+		for (const a of nonFoundational.slice(0, remainingSlots)) {
+			result.push(a);
+			includedIds.add(a.id);
+		}
 	}
 
 	return result;
