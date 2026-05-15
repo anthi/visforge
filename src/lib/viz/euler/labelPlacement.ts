@@ -21,41 +21,56 @@ export type PlacedLabel = {
 	color: string;
 };
 
-// ─── Scoring ──────────────────────────────────────────────────────────────────
+// ─── Boundary sampling ────────────────────────────────────────────────────────
 
-const SCORE_RADIUS = 150;
+/** Sample ~N evenly-spaced points along the ring perimeter. */
+function sampleRingPoints(ring: number[][], n: number): [number, number][] {
+	const pts: [number, number][] = [];
+	if (ring.length < 2) return pts;
+	const step = Math.max(1, Math.floor(ring.length / n));
+	for (let i = 0; i < ring.length; i += step) {
+		pts.push([ring[i][0], ring[i][1]]);
+	}
+	return pts;
+}
 
-function scorePoint(
+// ─── Penalty scoring ──────────────────────────────────────────────────────────
+
+/**
+ * Lower score = better placement.
+ *   +10 per dot within 25px
+ *   +10 per boundary sample point within 20px
+ *   +10 per already-placed label within 35px
+ */
+function penaltyScore(
 	px: number,
 	py: number,
 	allNodes: EulerNode[],
+	boundaryPts: [number, number][],
 	placed: [number, number][]
 ): number {
 	let score = 0;
 	for (const n of allNodes) {
-		const d = Math.sqrt((n.x - px) ** 2 + (n.y - py) ** 2);
-		score += d < SCORE_RADIUS ? d : SCORE_RADIUS;
+		const d2 = (n.x - px) ** 2 + (n.y - py) ** 2;
+		if (d2 < 25 * 25) score += 10;
+	}
+	for (const [bx, by] of boundaryPts) {
+		const d2 = (bx - px) ** 2 + (by - py) ** 2;
+		if (d2 < 20 * 20) score += 10;
 	}
 	for (const [lx, ly] of placed) {
-		const d = Math.sqrt((lx - px) ** 2 + (ly - py) ** 2);
-		score += (d < SCORE_RADIUS ? d : SCORE_RADIUS) * 2;
+		const d2 = (lx - px) ** 2 + (ly - py) ** 2;
+		if (d2 < 35 * 35) score += 10;
 	}
 	return score;
 }
 
-// ─── Disc label placement via polar grid inside cluster polygon ───────────────
+// ─── Disc label placement via ray casting inside cluster polygon ──────────────
 
-/**
- * Find the best position for a disc sub-label inside its cluster polygon.
- *
- * Strategy: sample a polar grid of candidates from the anchor centroid
- * (16 directions × 5 radii = 80 candidates), keep only those inside the
- * cluster ring, score each by clearance from all dots + already-placed labels,
- * and return the highest-scoring candidate.
- *
- * If the anchor is outside the polygon (edge case), fall back to the
- * polygon centroid as the starting point.
- */
+const N_DIRS = 16;
+const RADII = [0, 20, 40, 60, 80, 100, 130, 160];
+const FALLBACK_THRESHOLD = 30;
+
 function discLabelPos(
 	anchorX: number,
 	anchorY: number,
@@ -63,18 +78,17 @@ function discLabelPos(
 	allNodes: EulerNode[],
 	placed: [number, number][]
 ): [number, number] {
-	// Snap to polygon centroid if anchor landed outside
+	// Snap start to polygon centroid if anchor is outside
 	let startX = anchorX;
 	let startY = anchorY;
 	if (!pointInRing(anchorX, anchorY, ring)) {
 		[startX, startY] = polygonCentroid(ring);
 	}
 
-	const N_DIRS = 16;
-	const RADII = [0, 20, 40, 60, 80, 100, 130, 160];
+	const boundaryPts = sampleRingPoints(ring, 60);
 
 	let bestPos: [number, number] = [startX, startY];
-	let bestScore = scorePoint(startX, startY, allNodes, placed);
+	let bestScore = Infinity;
 
 	for (let i = 0; i < N_DIRS; i++) {
 		const angle = (i / N_DIRS) * 2 * Math.PI;
@@ -84,14 +98,21 @@ function discLabelPos(
 		for (const r of RADII) {
 			const cx = startX + dx * r;
 			const cy = startY + dy * r;
-			if (!pointInRing(cx, cy, ring)) break; // hit boundary on this ray, skip farther
+			if (!pointInRing(cx, cy, ring)) break; // hit boundary on this ray
 
-			const score = scorePoint(cx, cy, allNodes, placed);
-			if (score > bestScore) {
+			const score = penaltyScore(cx, cy, allNodes, boundaryPts, placed);
+			if (score < bestScore) {
 				bestScore = score;
 				bestPos = [cx, cy];
 			}
 		}
+	}
+
+	// If no candidate found below threshold, fall back to polygon centroid
+	if (bestScore > FALLBACK_THRESHOLD) {
+		const centroid = polygonCentroid(ring);
+		const centroidScore = penaltyScore(centroid[0], centroid[1], allNodes, boundaryPts, placed);
+		if (centroidScore < bestScore) return centroid;
 	}
 
 	return bestPos;
@@ -99,13 +120,6 @@ function discLabelPos(
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/**
- * Place discipline sub-labels using ray casting inside cluster polygons.
- *
- * For each label: casts rays from the discipline dot centroid, tests candidates
- * against the cluster polygon boundary, scores by clearance from all dots and
- * already-placed labels. Fully deterministic, no simulation.
- */
 export function placeDiscLabels(
 	rawLabels: RawDiscLabel[],
 	allNodes: EulerNode[],

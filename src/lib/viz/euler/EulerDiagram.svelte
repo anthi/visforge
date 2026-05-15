@@ -327,7 +327,7 @@
 			</text>
 		{/each}
 
-		<!-- Discipline sub-labels — ray-cast inside cluster polygon, 55% opacity -->
+		<!-- Discipline sub-labels — 10px, 60% opacity, subordinate to cluster labels -->
 		{#each discLabels as dl}
 			{@const dlOp = clusterOp(discLabelCluster(dl.id))}
 			<text
@@ -336,11 +336,11 @@
 				text-anchor="middle"
 				dominant-baseline="middle"
 				fill={dl.color}
-				font-size={10}
+				font-size={9}
 				font-weight={400}
 				font-family="'JetBrains Mono', 'Fira Mono', monospace"
 				letter-spacing="0.02em"
-				fill-opacity={0.55 * dlOp}
+				fill-opacity={0.60 * dlOp}
 				pointer-events="none"
 			>
 				{#if dl.label.length > 12}
