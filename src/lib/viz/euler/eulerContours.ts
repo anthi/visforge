@@ -52,7 +52,7 @@ function buildContour(
 	if (nodes.length < 4) return null;
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const estimator = (contourDensity as any)<EulerNode>()
+	const estimator = (contourDensity as any)()
 		.x((n: EulerNode) => n.x)
 		.y((n: EulerNode) => n.y)
 		.size([width, height])

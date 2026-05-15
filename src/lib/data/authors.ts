@@ -95,13 +95,13 @@ export function allocateAuthorSlots(
 	// sqrt weights from aggregate pub count per field
 	const discPubCounts = new Map<string, number>();
 	for (const [field, group] of byField) {
-		discPubCounts.set(disc, group.reduce((s, a) => s + a.pubCount, 0));
+		discPubCounts.set(field, group.reduce((s, a) => s + a.pubCount, 0));
 	}
 	const sqrtSum = [...discPubCounts.values()].reduce((s, c) => s + Math.sqrt(c), 0) || 1;
 
 	const result: AuthorData[] = [];
 	for (const [field, group] of byField) {
-		const w = Math.sqrt(discPubCounts.get(disc) ?? 1) / sqrtSum;
+		const w = Math.sqrt(discPubCounts.get(field) ?? 1) / sqrtSum;
 		const slots = 1 + Math.round(remainder * w);
 		const sorted = [...group].sort((a, b) => b.withinFieldPercentile - a.withinFieldPercentile);
 		result.push(...sorted.slice(0, slots));
