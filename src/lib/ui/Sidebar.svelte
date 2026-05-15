@@ -182,17 +182,17 @@
 	</section>
 	{/if}
 
-	<!-- Venue filter — checklist, multi-select -->
+	<!-- Venue filter — exclusion checklist (checked = visible, unchecked = hidden) -->
 	<section>
 		<p class="section-label">
-			Venue{$venueFilter.size > 0 ? ` · ${$venueFilter.size} selected` : ''}
+			Venue{$venueFilter.size > 0 ? ` · ${$venueFilter.size} hidden` : ''}
 		</p>
 		<div class="venue-list">
 			{#each $uniqueVenues as v}
 				<label class="venue-item">
 					<input
 						type="checkbox"
-						checked={$venueFilter.has(v)}
+						checked={!$venueFilter.has(v)}
 						on:change={() => toggleVenue(v)}
 					/>
 					<span class="venue-name">{v}</span>

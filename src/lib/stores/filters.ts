@@ -54,7 +54,7 @@ export const filteredPublications = derived(
 			if ($subs.size > 0 && !p.subfields.some((s) => $subs.has(s))) return false;
 			if ($doms.size > 0 && !p.domains.some((d) => $doms.has(d))) return false;
 			if (p.year !== undefined && (p.year < $range.min || p.year > $range.max)) return false;
-			if ($venue.size > 0 && (!p.venue || !$venue.has(p.venue))) return false;
+			if ($venue.size > 0 && p.venue && $venue.has(p.venue)) return false;
 			// Text search is a highlight in authors lens, not a filter
 			if (q && $lens !== 'authors') {
 				const inTitle = p.title.toLowerCase().includes(q);
@@ -123,6 +123,8 @@ export function toggleDomain(id: string): void {
 	});
 }
 
+// venueFilter is an exclusion set: venues in the set are hidden.
+// Empty set = show all (all checkboxes appear checked).
 export function toggleVenue(venue: string): void {
 	venueFilter.update((prev) => {
 		const next = new Set(prev);
