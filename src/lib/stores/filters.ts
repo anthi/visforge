@@ -5,7 +5,7 @@ import { deriveAuthors, allocateAuthorSlots } from '$lib/data/authors';
 export type { AuthorData } from '$lib/data/authors';
 
 export type YearRange = { min: number; max: number };
-export type Lens = 'disciplines' | 'subfields' | 'domains' | 'authors';
+export type Lens = 'fields' | 'subfields' | 'applications' | 'authors';
 
 // ─── Year bounds (derived from dataset) ──────────────────────────────────────
 export const yearBounds = derived(publications, ($pubs) => {
@@ -16,15 +16,15 @@ export const yearBounds = derived(publications, ($pubs) => {
 });
 
 // ─── Filter state ─────────────────────────────────────────────────────────────
-export const activeDisciplines = writable<Set<string>>(new Set());
+export const activeFields = writable<Set<string>>(new Set());
 export const activeSubfields = writable<Set<string>>(new Set());
-export const activeDomains = writable<Set<string>>(new Set());
+export const activeApplications = writable<Set<string>>(new Set());
 export const searchQuery = writable<string>('');
 export const yearRange = writable<YearRange>({ min: 1944, max: 2030 });
 export const venueFilter = writable<Set<string>>(new Set());
 
 // ─── UI / visual state (not filters — do not affect filteredPublications) ─────
-export const currentLens = writable<Lens>('disciplines');
+export const currentLens = writable<Lens>('fields');
 export const clusterOpacities = writable<Record<string, number>>(
 	Object.fromEntries(CLUSTERS.map((c) => [c.id, 1]))
 );
@@ -46,13 +46,13 @@ export const uniqueVenues = derived(publications, ($pubs) => {
 // In the 'authors' lens, text search is used only for highlighting — not filtering —
 // so the full author set stays visible and the search narrows within it.
 export const filteredPublications = derived(
-	[publications, activeDisciplines, activeSubfields, activeDomains, searchQuery, yearRange, venueFilter, currentLens],
+	[publications, activeFields, activeSubfields, activeApplications, searchQuery, yearRange, venueFilter, currentLens],
 	([$pubs, $discs, $subs, $doms, $query, $range, $venue, $lens]) => {
 		const q = $query.trim().toLowerCase();
 		return $pubs.filter((p) => {
-			if ($discs.size > 0 && !p.disciplines.some((d) => $discs.has(d))) return false;
+			if ($discs.size > 0 && !p.fields.some((d) => $discs.has(d))) return false;
 			if ($subs.size > 0 && !p.subfields.some((s) => $subs.has(s))) return false;
-			if ($doms.size > 0 && !p.domains.some((d) => $doms.has(d))) return false;
+			if ($doms.size > 0 && !p.applications.some((d) => $doms.has(d))) return false;
 			if (p.year !== undefined && (p.year < $range.min || p.year > $range.max)) return false;
 			if ($venue.size > 0 && p.venue && $venue.has(p.venue)) return false;
 			// Text search is a highlight in authors lens, not a filter
@@ -71,7 +71,7 @@ export const filteredPublications = derived(
 export const clusterCounts = derived(filteredPublications, ($pubs) => {
 	const counts: Record<string, number> = {};
 	for (const p of $pubs) {
-		const c = CLUSTER_MAP[p.disciplines[0] ?? ''] ?? 'formal';
+		const c = CLUSTER_MAP[p.fields[0] ?? ''] ?? 'formal';
 		counts[c] = (counts[c] ?? 0) + 1;
 	}
 	return counts;
@@ -99,8 +99,8 @@ export const visibleAuthors = derived(
 );
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
-export function toggleDiscipline(id: string): void {
-	activeDisciplines.update((prev) => {
+export function toggleField(id: string): void {
+	activeFields.update((prev) => {
 		const next = new Set(prev);
 		next.has(id) ? next.delete(id) : next.add(id);
 		return next;
@@ -115,8 +115,8 @@ export function toggleSubfield(id: string): void {
 	});
 }
 
-export function toggleDomain(id: string): void {
-	activeDomains.update((prev) => {
+export function toggleApplication(id: string): void {
+	activeApplications.update((prev) => {
 		const next = new Set(prev);
 		next.has(id) ? next.delete(id) : next.add(id);
 		return next;
@@ -134,9 +134,9 @@ export function toggleVenue(venue: string): void {
 }
 
 export function clearFilters(): void {
-	activeDisciplines.set(new Set());
+	activeFields.set(new Set());
 	activeSubfields.set(new Set());
-	activeDomains.set(new Set());
+	activeApplications.set(new Set());
 	searchQuery.set('');
 	venueFilter.set(new Set());
 	yearBounds.subscribe((bounds) => yearRange.set({ ...bounds }))();

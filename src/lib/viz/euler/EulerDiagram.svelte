@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { filteredPublications, disciplines, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, allDerivedAuthors, visibleAuthors, searchQuery } from '$lib/stores';
+	import { filteredPublications, fields, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, allDerivedAuthors, visibleAuthors, searchQuery } from '$lib/stores';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
-	import { disciplineToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
+	import { fieldToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
 	import Tooltip from '$lib/ui/Tooltip.svelte';
 	import DetailsPanel from './DetailsPanel.svelte';
 
@@ -11,7 +11,7 @@
 	export let clusterOpacities: Record<string, number> = {};
 	import { runEulerLayout, runAuthorLayout, type EulerNode, type AuthorNode } from './eulerLayout';
 	import { computeClusterContours, computeBridgeContours, type RegionContour } from './eulerContours';
-	import { placeDiscLabels, type PlacedLabel, type RawDiscLabel } from './labelPlacement';
+	import { placeDiscLabels, type PlacedLabel, type RawFieldLabel } from './labelPlacement';
 
 	let container: HTMLDivElement;
 	let width = 900;
@@ -22,7 +22,7 @@
 	let allAuthorNodes: AuthorNode[] = [];
 	let clusterContours: RegionContour[] = [];
 	let bridgeContours: RegionContour[] = [];
-	let discLabels: PlacedLabel[] = [];
+	let fieldLabels: PlacedLabel[] = [];
 
 	function interpPositions(a: Record<string, [number, number]>, b: Record<string, [number, number]>) {
 		return (t: number): Record<string, [number, number]> => {
@@ -48,28 +48,28 @@
 		interpolate: interpPositions
 	});
 
-	// ─── Discipline sub-label specs ───────────────────────────────────────────
-	const DISC_SPECS: { id: string; label: string; layer: 'discipline' | 'subfield' }[] = [
-		{ id: 'information_visualization', label: 'Information Visualization', layer: 'discipline' },
-		{ id: 'hci',                        label: 'HCI',                        layer: 'discipline' },
-		{ id: 'psychology',                 label: 'Psychology',                 layer: 'discipline' },
-		{ id: 'economics',                  label: 'Economics',                  layer: 'discipline' },
-		{ id: 'statistics',                 label: 'Statistics',                 layer: 'discipline' },
+	// ─── Field sub-label specs ───────────────────────────────────────────
+	const FIELD_SPECS: { id: string; label: string; layer: 'field' | 'subfield' }[] = [
+		{ id: 'information_visualization', label: 'Information Visualization', layer: 'field' },
+		{ id: 'hci',                        label: 'HCI',                        layer: 'field' },
+		{ id: 'psychology',                 label: 'Psychology',                 layer: 'field' },
+		{ id: 'economics',                  label: 'Economics',                  layer: 'field' },
+		{ id: 'statistics',                 label: 'Statistics',                 layer: 'field' },
 		{ id: 'decision_theory',            label: 'Decision Theory',            layer: 'subfield'   },
-		{ id: 'management_science',         label: 'Management Science',         layer: 'discipline' },
-		{ id: 'neuroscience',               label: 'Neuroscience',               layer: 'discipline' },
-		{ id: 'cognitive_science',          label: 'Cognitive Science',          layer: 'discipline' },
-		{ id: 'philosophy',                 label: 'Philosophy',                 layer: 'discipline' },
-		{ id: 'operations_research',        label: 'Operations Research',        layer: 'discipline' },
-		{ id: 'artificial_intelligence',    label: 'AI',                         layer: 'discipline' },
-		{ id: 'sociology',                  label: 'Sociology',                  layer: 'discipline' },
+		{ id: 'management_science',         label: 'Management Science',         layer: 'field' },
+		{ id: 'neuroscience',               label: 'Neuroscience',               layer: 'field' },
+		{ id: 'cognitive_science',          label: 'Cognitive Science',          layer: 'field' },
+		{ id: 'philosophy',                 label: 'Philosophy',                 layer: 'field' },
+		{ id: 'operations_research',        label: 'Operations Research',        layer: 'field' },
+		{ id: 'artificial_intelligence',    label: 'AI',                         layer: 'field' },
+		{ id: 'sociology',                  label: 'Sociology',                  layer: 'field' },
 	];
 
-	function buildRawDiscLabels(ns: EulerNode[]): RawDiscLabel[] {
-		return DISC_SPECS.flatMap((spec) => {
+	function buildRawFieldLabels(ns: EulerNode[]): RawFieldLabel[] {
+		return FIELD_SPECS.flatMap((spec) => {
 			const matching =
-				spec.layer === 'discipline'
-					? ns.filter((n) => n.publication.disciplines.includes(spec.id))
+				spec.layer === 'field'
+					? ns.filter((n) => n.publication.fields.includes(spec.id))
 					: ns.filter((n) => n.publication.subfields.includes(spec.id));
 			if (matching.length < 2) return [];
 
@@ -77,12 +77,12 @@
 			const anchorY = matching.reduce((s, n) => s + n.y, 0) / matching.length;
 
 			let clusterId: string;
-			if (spec.layer === 'discipline') {
-				clusterId = disciplineToCluster.get(spec.id) ?? '';
+			if (spec.layer === 'field') {
+				clusterId = fieldToCluster.get(spec.id) ?? '';
 			} else {
 				const counts = new Map<string, number>();
 				for (const n of matching) {
-					const cId = disciplineToCluster.get(n.publication.disciplines[0] ?? '') ?? '';
+					const cId = fieldToCluster.get(n.publication.fields[0] ?? '') ?? '';
 					counts.set(cId, (counts.get(cId) ?? 0) + 1);
 				}
 				clusterId = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
@@ -96,7 +96,7 @@
 	// ─── Reactive layout ──────────────────────────────────────────────────────
 	$: {
 		const pubs = $filteredPublications;
-		const discs = $disciplines;
+		const discs = $fields;
 		const w = width;
 		const h = height;
 		const lens = $currentLens;
@@ -112,7 +112,7 @@
 			bridgeContours = computeBridgeContours(nodes, w, h);
 
 			const clusterPolygons = new Map(clusterContours.map((c) => [c.id, c.coordinates]));
-			discLabels = placeDiscLabels(buildRawDiscLabels(nodes), nodes, clusterPolygons, w, h);
+			fieldLabels = placeDiscLabels(buildRawFieldLabels(nodes), nodes, clusterPolygons, w, h);
 		}
 	}
 
@@ -170,7 +170,7 @@
 	}
 
 	function nodeCluster(node: EulerNode): string {
-		return disciplineToCluster.get(node.publication.disciplines[0] ?? '') ?? 'formal';
+		return fieldToCluster.get(node.publication.fields[0] ?? '') ?? 'formal';
 	}
 
 	function authorColor(node: AuthorNode): string {
@@ -182,12 +182,12 @@
 	}
 
 	// Map disc label id → cluster id (for opacity lookup)
-	const DISC_CLUSTER: Record<string, string> = Object.fromEntries(
-		DISC_SPECS.map((s) => [s.id, s.layer === 'discipline' ? (disciplineToCluster.get(s.id) ?? '') : ''])
+	const FIELD_CLUSTER: Record<string, string> = Object.fromEntries(
+		FIELD_SPECS.map((s) => [s.id, s.layer === 'field' ? (fieldToCluster.get(s.id) ?? '') : ''])
 	);
 
-	function discLabelCluster(discId: string): string {
-		return DISC_CLUSTER[discId] ?? '';
+	function fieldLabelCluster(fieldId: string): string {
+		return FIELD_CLUSTER[fieldId] ?? '';
 	}
 
 	/** Split a label at the word boundary nearest to the string midpoint. */
@@ -211,15 +211,15 @@
 	let panelX = 0;
 	let panelY = 0;
 
-	/** Primary discipline of the currently hovered publication (for dot highlight logic). */
-	$: hoveredDisc = $hoveredPublication?.disciplines[0] ?? null;
+	/** Primary field of the currently hovered publication (for dot highlight logic). */
+	$: hoveredField = $hoveredPublication?.fields[0] ?? null;
 
 	// Cluster hover badge position
 	let clusterBadgePos: { x: number; y: number; label: string } | null = null;
 
 	// Author hover state
 	let hoveredAuthorId: string | null = null;
-	let authorTooltip: { x: number; y: number; name: string; discipline: string; pubs: number } | null = null;
+	let authorTooltip: { x: number; y: number; name: string; field: string; pubs: number } | null = null;
 
 	function handleDotEnter(e: PointerEvent, node: EulerNode) {
 		setHovered(node.id);
@@ -250,7 +250,7 @@
 		authorTooltip = {
 			x: tx, y: ty,
 			name: node.author.name,
-			discipline: node.author.primaryDiscipline.replace(/_/g, ' '),
+			field: node.author.primaryField.replace(/_/g, ' '),
 			pubs: node.author.pubCount
 		};
 	}
@@ -297,7 +297,7 @@
 	{#if authorTooltip}
 		<div class="author-tooltip" style="left:{authorTooltip.x}px; top:{authorTooltip.y}px">
 			<span class="author-tooltip-name">{authorTooltip.name}</span>
-			<span class="author-tooltip-meta">{authorTooltip.discipline} · {authorTooltip.pubs} pub{authorTooltip.pubs !== 1 ? 's' : ''}</span>
+			<span class="author-tooltip-meta">{authorTooltip.field} · {authorTooltip.pubs} pub{authorTooltip.pubs !== 1 ? 's' : ''}</span>
 		</div>
 	{/if}
 
@@ -342,7 +342,7 @@
 				{@const nc = nodeCluster(node)}
 				{@const dotOp = (() => {
 					if ($hoveredId !== null) {
-						return node.publication.disciplines[0] !== hoveredDisc ? 0.08 : 0.85;
+						return node.publication.fields[0] !== hoveredField ? 0.08 : 0.85;
 					}
 					if ($hoveredCategoryId !== null) {
 						return nc === $hoveredCategoryId ? 0.75 : 0.10;
@@ -466,9 +466,9 @@
 			</text>
 		{/each}
 
-		<!-- Discipline sub-labels -->
-		{#each discLabels as dl}
-			{@const dlOp = clusterOp(discLabelCluster(dl.id))}
+		<!-- Field sub-labels -->
+		{#each fieldLabels as dl}
+			{@const flOp = clusterOp(fieldLabelCluster(dl.id))}
 			<text
 				x={dl.x}
 				y={dl.y}
@@ -479,7 +479,7 @@
 				font-weight={400}
 				font-family="'JetBrains Mono', 'Fira Mono', monospace"
 				letter-spacing="0.02em"
-				fill-opacity={0.60 * dlOp}
+				fill-opacity={0.60 * flOp}
 				pointer-events="none"
 			>
 				{#if dl.label.length > 12}

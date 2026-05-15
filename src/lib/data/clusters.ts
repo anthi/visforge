@@ -5,11 +5,11 @@ export type ClusterEntry = {
 	label: string;
 	color: string;
 	description: string;
-	disciplines: string[];
+	fields: string[];
 };
 
-// ─── Single source of truth: discipline → cluster ─────────────────────────────
-// Adding a discipline requires exactly one new entry here.
+// ─── Single source of truth: field → cluster ─────────────────────────────
+// Adding a field requires exactly one new entry here.
 export const CLUSTER_MAP: Record<string, string> = {
 	psychology:                'mind',
 	cognitive_science:         'mind',
@@ -42,13 +42,13 @@ export const CLUSTER_COLORS: Record<string, string> = {
 // ─── Canonical dot color lookup ────────────────────────────────────────────────
 // Every dot color MUST go through this function. No other color source exists.
 export function getDotColor(publication: Publication): string {
-	const primaryDiscipline = publication.disciplines[0];
-	const clusterId = CLUSTER_MAP[primaryDiscipline] ?? 'formal';
+	const primaryField = publication.fields[0];
+	const clusterId = CLUSTER_MAP[primaryField] ?? 'formal';
 	return CLUSTER_COLORS[clusterId];
 }
 
 // ─── Cluster metadata ──────────────────────────────────────────────────────────
-const CLUSTER_META: Record<string, Omit<ClusterEntry, 'id' | 'disciplines'>> = {
+const CLUSTER_META: Record<string, Omit<ClusterEntry, 'id' | 'fields'>> = {
 	mind: {
 		label: 'Mind & Behavior',
 		color: CLUSTER_COLORS.mind,
@@ -80,7 +80,7 @@ const CLUSTER_META: Record<string, Omit<ClusterEntry, 'id' | 'disciplines'>> = {
 export const CLUSTERS: ClusterEntry[] = Object.entries(CLUSTER_META).map(([id, meta]) => ({
 	id,
 	...meta,
-	disciplines: Object.entries(CLUSTER_MAP)
+	fields: Object.entries(CLUSTER_MAP)
 		.filter(([, cId]) => cId === id)
 		.map(([dId]) => dId),
 }));
@@ -88,4 +88,4 @@ export const CLUSTERS: ClusterEntry[] = Object.entries(CLUSTER_META).map(([id, m
 export const clustersById = new Map<string, ClusterEntry>(CLUSTERS.map((c) => [c.id, c]));
 
 /** Backwards-compatible Map for .get() usage in layout and contour code. */
-export const disciplineToCluster = new Map<string, string>(Object.entries(CLUSTER_MAP));
+export const fieldToCluster = new Map<string, string>(Object.entries(CLUSTER_MAP));

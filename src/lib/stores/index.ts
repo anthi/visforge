@@ -1,21 +1,21 @@
 export {
 	publications,
-	disciplines,
+	fields,
 	subfields,
-	domains,
+	applications,
 	clusters,
 	publicationsById,
-	disciplinesById,
+	fieldsById,
 	subfieldsById,
-	domainsById,
+	applicationsById,
 	clustersById
 } from './entities';
 export {
 	type Lens,
 	type YearRange,
-	activeDisciplines,
+	activeFields,
 	activeSubfields,
-	activeDomains,
+	activeApplications,
 	searchQuery,
 	yearRange,
 	yearBounds,
@@ -30,9 +30,9 @@ export {
 	allDerivedAuthors,
 	visibleAuthors,
 	toggleVenue,
-	toggleDiscipline,
+	toggleField,
 	toggleSubfield,
-	toggleDomain,
+	toggleApplication,
 	clearFilters
 } from './filters';
 export {

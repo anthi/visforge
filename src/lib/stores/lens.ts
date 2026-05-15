@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-// null = cluster overview (Level 1); string = that cluster is expanded to show disciplines
+// null = cluster overview (Level 1); string = that cluster is expanded to show fields
 export const expandedClusterId = writable<string | null>(null);
 
 export function expandCluster(id: string): void {

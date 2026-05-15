@@ -1,7 +1,7 @@
 import { contourDensity, geoPath } from 'd3';
 import type { Publication } from '$lib/models/publication';
 import type { EulerNode } from './eulerLayout';
-import { CLUSTERS, clustersById, disciplineToCluster } from '$lib/data/clusters';
+import { CLUSTERS, clustersById, fieldToCluster } from '$lib/data/clusters';
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
@@ -215,7 +215,7 @@ export function computeClusterContours(
 
 	return CLUSTERS.flatMap((cluster) => {
 		const clusterNodes = nodes.filter(
-			(n) => disciplineToCluster.get(n.publication.disciplines[0] ?? '') === cluster.id
+			(n) => fieldToCluster.get(n.publication.fields[0] ?? '') === cluster.id
 		);
 
 		const result = buildContour(clusterNodes, width, height, CLUSTER_BANDWIDTH, CLUSTER_LEVEL);
@@ -283,7 +283,7 @@ const BRIDGE_DEFS: {
 		label: 'XAI / Explainability',
 		parentClusters: ['formal', 'design'],
 		filter: (p) => {
-			const d = p.disciplines;
+			const d = p.fields;
 			const inFormal = d.some((x) =>
 				['artificial_intelligence', 'computer_science', 'statistics', 'mathematics',
 				 'economics', 'operations_research'].includes(x)

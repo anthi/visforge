@@ -3,10 +3,10 @@ import type { EulerNode } from './eulerLayout';
 export function getNodeRegion(
 	node: EulerNode,
 	expandedClusterId: string | null,
-	disciplineToCluster: Map<string, string>
+	fieldToCluster: Map<string, string>
 ): string {
-	const primaryDisc = node.publication.disciplines[0] ?? '';
-	const clusterId = disciplineToCluster.get(primaryDisc) ?? 'unknown';
+	const primaryDisc = node.publication.fields[0] ?? '';
+	const clusterId = fieldToCluster.get(primaryDisc) ?? 'unknown';
 	if (expandedClusterId === null) return clusterId;
 	if (clusterId === expandedClusterId) return primaryDisc;
 	return clusterId;

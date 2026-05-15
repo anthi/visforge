@@ -20,9 +20,9 @@
 
 	type LensOption = { id: Lens; label: string };
 	const LENSES: LensOption[] = [
-		{ id: 'disciplines', label: 'Disciplines' },
+		{ id: 'fields', label: 'Fields' },
 		{ id: 'subfields',   label: 'Subfields'   },
-		{ id: 'domains',     label: 'Domains'      },
+		{ id: 'applications',     label: 'Applications'      },
 		{ id: 'authors',     label: 'Authors'      },
 	];
 
@@ -90,7 +90,7 @@
 
 <aside class="sidebar">
 	<header>
-		<h1>VisForge</h1>
+		<h1>DecisionVerse</h1>
 		{#if $currentLens === 'authors'}
 			<p class="subtitle">{$visibleAuthors.length} authors · {$filteredPublications.length} publications</p>
 		{:else}

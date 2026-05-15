@@ -1,6 +1,6 @@
-# VisForge — Claude Code Index
+# DecisionVerse — Claude Code Index
 
-VisForge maps the intellectual landscape of decision making across disciplines, using SvelteKit + D3.js. Owner: Evanthia Dimara, Utrecht University.
+DecisionVerse maps the intellectual landscape of decision making across fields, using SvelteKit + D3.js. Owner: Evanthia Dimara, Utrecht University.
 
 **Tech stack:** SvelteKit · D3.js v7 · TypeScript · Vercel · GitHub
 **Current phase:** 7.5 (lens switching with animated transitions) — next: Phase 5 dataset rebuild

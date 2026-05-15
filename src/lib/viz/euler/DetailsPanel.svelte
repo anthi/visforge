@@ -15,8 +15,8 @@
 	$: px = x + 18 + PANEL_W > containerWidth ? x - PANEL_W - 18 : x + 18;
 	$: py = Math.max(8, Math.min(y - 40, containerHeight - PANEL_H - 8));
 
-	function clusterColor(disciplines: string[]): string {
-		return CLUSTER_COLORS[CLUSTER_MAP[disciplines[0] ?? ''] ?? 'formal'] ?? '#888';
+	function clusterColor(fields: string[]): string {
+		return CLUSTER_COLORS[CLUSTER_MAP[fields[0] ?? ''] ?? 'formal'] ?? '#888';
 	}
 
 	function dismiss(e: MouseEvent) {
@@ -39,11 +39,11 @@
 
 			<p class="meta">{[pub.year, pub.venue].filter(Boolean).join(' · ')}</p>
 
-			{#if pub.disciplines.length > 0}
+			{#if pub.fields.length > 0}
 				<div class="tag-section">
-					<span class="tag-label">Disciplines</span>
+					<span class="tag-label">Fields</span>
 					<div class="tags">
-						{#each pub.disciplines as id}
+						{#each pub.fields as id}
 							<span class="tag" style="border-color:{clusterColor([id])};color:{clusterColor([id])}">{id.replace(/_/g, ' ')}</span>
 						{/each}
 					</div>
@@ -61,11 +61,11 @@
 				</div>
 			{/if}
 
-			{#if pub.domains.length > 0}
+			{#if pub.applications.length > 0}
 				<div class="tag-section">
-					<span class="tag-label">Domains</span>
+					<span class="tag-label">Applications</span>
 					<div class="tags">
-						{#each pub.domains as id}
+						{#each pub.applications as id}
 							<span class="tag tag-neutral">{id.replace(/_/g, ' ')}</span>
 						{/each}
 					</div>

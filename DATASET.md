@@ -1,4 +1,4 @@
-# VisForge — Dataset
+# DecisionVerse — Dataset
 
 ## Publication Data Model
 
@@ -13,9 +13,9 @@ type Publication = {
   authors: Author[];
 
   // Three orthogonal classification axes
-  disciplines: string[];    // Layer 1: Psychology, InfoVis, HCI, Economics...
+  fields: string[];    // Layer 1: Psychology, InfoVis, HCI, Economics...
   subfields: string[];      // Layer 2: Behavioral Economics, MCDM, NDM, DSS...
-  domains: string[];        // Layer 3: Medical, Organizational, Energy...
+  applications: string[];        // Layer 3: Medical, Organizational, Energy...
 
   keywords?: string[];
   citations?: string[];
@@ -30,21 +30,21 @@ type Publication = {
 
 Author prominence is **always computed within-field, never globally**.
 A visualization researcher with 8 DM-relevant papers is as visible as a psychologist with 80,
-if both rank highly within their respective discipline's distribution.
+if both rank highly within their respective field's distribution.
 
 ```typescript
 type Author = {
   id: string;
   name: string;
   affiliation?: string;
-  primaryDiscipline: string;
-  disciplines: string[];
+  primaryField: string;
+  fields: string[];
 
   // All scores are within-field percentile ranks (0-1), never global counts
   withinFieldPercentile: number;     // primary visibility score
   topicalConsistency: number;        // % of their papers that are DM-relevant
   temporalSpread: number;            // career span within dataset (normalized)
-  crossFieldPresence: number;        // n distinct disciplines they bridge
+  crossFieldPresence: number;        // n distinct fields they bridge
   isFoundational: boolean;           // explicit override for canonical figures
 };
 ```
@@ -60,10 +60,10 @@ Volume is never the primary axis.
 
 ---
 
-## Discipline Taxonomy
+## Field Taxonomy
 
 ```typescript
-const DISCIPLINES = [
+const FIELDS = [
   // Core sciences
   "psychology", "economics", "philosophy", "cognitive_science",
   "neuroscience", "statistics", "mathematics", "computer_science",
@@ -80,7 +80,7 @@ const SUBFIELDS = [
   "recommender_systems", "data_driven_decision_making", "neuroeconomics"
 ];
 
-const DOMAINS = [
+const APPLICATIONS = [
   "medical", "organizational", "energy", "legal",
   "financial", "ui_interactive", "education", "crisis_emergency"
 ];
@@ -95,7 +95,7 @@ It must not be InfoVis-heavy. It must represent the full intellectual landscape.
 
 ### Target distribution (300 publications)
 
-| Discipline | Target n | Example venues |
+| Field | Target n | Example venues |
 |---|---|---|
 | Psychology / JDM | 50 | Psychological Review, JEP, Cognition |
 | Behavioral Economics | 35 | QJE, AER, Journal of Finance |
@@ -131,18 +131,18 @@ It must not be InfoVis-heavy. It must represent the full intellectual landscape.
   "authors": [{"name": "Kahneman"}, {"name": "Tversky"}],
   "year": 1979,
   "venue": "Econometrica",
-  "disciplines": ["psychology", "economics"],
+  "fields": ["psychology", "economics"],
   "subfields": ["behavioral_economics", "judgment_and_decision_making"],
-  "domains": []
+  "applications": []
 }
 
 {
   "title": "A Decision Support System for ICU Triage",
   "year": 2019,
   "venue": "Journal of Medical Informatics",
-  "disciplines": ["computer_science", "management_science"],
+  "fields": ["computer_science", "management_science"],
   "subfields": ["decision_support_systems"],
-  "domains": ["medical"]
+  "applications": ["medical"]
 }
 
 {
@@ -150,9 +150,9 @@ It must not be InfoVis-heavy. It must represent the full intellectual landscape.
   "authors": [{"name": "Dimara"}, {"name": "Bezerianos"}, {"name": "Dragicevic"}],
   "year": 2017,
   "venue": "IEEE TVCG",
-  "disciplines": ["information_visualization", "psychology"],
+  "fields": ["information_visualization", "psychology"],
   "subfields": ["judgment_and_decision_making"],
-  "domains": []
+  "applications": []
 }
 ```
 
@@ -160,4 +160,4 @@ It must not be InfoVis-heavy. It must represent the full intellectual landscape.
 
 ## Future: Zotero Integration (Phase 10)
 
-The mock dataset will be replaced by live extraction from the owner's Zotero library via the Zotero MCP connector. The same 3-axis taxonomy (disciplines / subfields / domains) applies. Mock tagging examples above serve as ground truth for validating automated extraction and classification.
+The mock dataset will be replaced by live extraction from the owner's Zotero library via the Zotero MCP connector. The same 3-axis taxonomy (fields / subfields / applications) applies. Mock tagging examples above serve as ground truth for validating automated extraction and classification.

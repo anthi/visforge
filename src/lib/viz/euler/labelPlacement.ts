@@ -3,13 +3,13 @@ import { largestRing, pointInRing, polygonCentroid } from './eulerContours';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-export type RawDiscLabel = {
+export type RawFieldLabel = {
 	id: string;
 	label: string;
 	anchorX: number;
 	anchorY: number;
 	color: string;
-	/** Cluster that owns this discipline — used to look up the clipping polygon. */
+	/** Cluster that owns this field — used to look up the clipping polygon. */
 	clusterId: string;
 };
 
@@ -121,7 +121,7 @@ function discLabelPos(
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export function placeDiscLabels(
-	rawLabels: RawDiscLabel[],
+	rawLabels: RawFieldLabel[],
 	allNodes: EulerNode[],
 	clusterPolygons: Map<string, number[][][][]>,
 	_width: number,

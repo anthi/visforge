@@ -7,7 +7,7 @@
 	export let y = 0;
 
 	$: clusterColor = pub
-		? (CLUSTER_COLORS[CLUSTER_MAP[pub.disciplines[0] ?? ''] ?? 'formal'] ?? '#888')
+		? (CLUSTER_COLORS[CLUSTER_MAP[pub.fields[0] ?? ''] ?? 'formal'] ?? '#888')
 		: '#888';
 
 	$: authorLine = pub
@@ -16,7 +16,7 @@
 
 	$: metaLine = pub ? [pub.year, pub.venue].filter(Boolean).join(' · ') : '';
 
-	$: discLine = pub?.disciplines[0]?.replace(/_/g, ' ') ?? '';
+	$: discLine = pub?.fields[0]?.replace(/_/g, ' ') ?? '';
 
 	$: shortTitle =
 		pub && pub.title.length > 90 ? pub.title.slice(0, 87) + '…' : (pub?.title ?? '');

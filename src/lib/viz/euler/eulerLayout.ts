@@ -23,8 +23,8 @@ type SimNode = SimulationNodeDatum & { publication: Publication };
 
 // ─── Seed maps (unit-square coordinates, scaled by CLUSTER_RADIUS) ────────────
 
-// Disciplines lens — intellectual proximity of contributing fields
-const DISC_SEED: Record<string, [number, number]> = {
+// Fields lens — intellectual proximity of contributing fields
+const FIELD_SEED: Record<string, [number, number]> = {
 	// Mind & Behavior (right)
 	psychology:               [ 1.0,   0.15],
 	cognitive_science:        [ 0.72, -0.25],
@@ -63,8 +63,8 @@ const SUBFIELD_SEED: Record<string, [number, number]> = {
 	data_driven_decision_making:   [ 0.10, -0.15],
 };
 
-// Domains lens — application contexts
-const DOMAIN_SEED: Record<string, [number, number]> = {
+// Applications lens — application contexts
+const APPLICATION_SEED: Record<string, [number, number]> = {
 	medical:           [ 0.85, -0.50],
 	organizational:    [ 0.85,  0.45],
 	financial:         [ 0.30,  1.05],
@@ -102,7 +102,7 @@ export function runAuthorLayout(
 	type AuthorSimNode = SimulationNodeDatum & { author: AuthorData };
 
 	const simNodes: AuthorSimNode[] = authors.map((author) => {
-		const seed = DISC_SEED[author.primaryDiscipline] ?? [0, 0];
+		const seed = FIELD_SEED[author.primaryField] ?? [0, 0];
 		const [jx, jy] = stableJitter(author.id);
 		return {
 			author,
@@ -115,7 +115,7 @@ export function runAuthorLayout(
 		let nodes: AuthorSimNode[] = [];
 		const force = (alpha: number) => {
 			for (const n of nodes) {
-				const seed = DISC_SEED[n.author.primaryDiscipline] ?? [0, 0];
+				const seed = FIELD_SEED[n.author.primaryField] ?? [0, 0];
 				const tx = cx + seed[0] * CLUSTER_RADIUS;
 				const ty = cy + seed[1] * CLUSTER_RADIUS;
 				n.vx = (n.vx ?? 0) + (tx - (n.x ?? cx)) * alpha * ALPHA_CLUSTER;
@@ -145,15 +145,15 @@ export function runAuthorLayout(
 
 export function runEulerLayout(
 	publications: Publication[],
-	_disciplines: TaxonomyEntry[],
+	_fields: TaxonomyEntry[],
 	width: number,
 	height: number,
-	lens: Lens = 'disciplines'
+	lens: Lens = 'fields'
 ): EulerNode[] {
 	const seedMap =
 		lens === 'subfields' ? SUBFIELD_SEED :
-		lens === 'domains'   ? DOMAIN_SEED   :
-		DISC_SEED; // disciplines and authors both fall back to disciplines layout
+		lens === 'applications'   ? APPLICATION_SEED   :
+		FIELD_SEED; // fields and authors both fall back to fields layout
 
 	const cx = width / 2;
 	const cy = height / 2;
@@ -196,11 +196,11 @@ function lensSeeds(
 	if (lens === 'subfields') {
 		return pub.subfields.map((s) => seedMap[s]).filter(Boolean) as [number, number][];
 	}
-	if (lens === 'domains') {
-		return pub.domains.map((d) => seedMap[d]).filter(Boolean) as [number, number][];
+	if (lens === 'applications') {
+		return pub.applications.map((d) => seedMap[d]).filter(Boolean) as [number, number][];
 	}
-	// disciplines (and authors fallback)
-	return pub.disciplines.map((d) => seedMap[d]).filter(Boolean) as [number, number][];
+	// fields (and authors fallback)
+	return pub.fields.map((d) => seedMap[d]).filter(Boolean) as [number, number][];
 }
 
 function clusterForce(

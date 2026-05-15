@@ -1,6 +1,6 @@
-# VisForge — Architecture & Design
+# DecisionVerse — Architecture & Design
 
-## Discipline Cluster Hierarchy (Level 1 — always visible)
+## Field Cluster Hierarchy (Level 1 — always visible)
 
 ```
 ├── Mind & Behavior
@@ -128,8 +128,8 @@ src/
 | 3 | Euler prototype — D3 force + convex hulls, static | DONE |
 | 4 | Euler interactions — hover, tooltip, selection, details panel | DONE |
 | 5 | Rebuild mock dataset: 3-axis ontology, 300 pubs, foundational papers | NEXT |
-| 6 | Update Publication model to disciplines/subfields/domains | |
-| 7 | Lens switching UI — disciplines / subfields / domains / authors | |
+| 6 | Update Publication model to fields/subfields/applications | |
+| 7 | Lens switching UI — fields / subfields / applications / authors | |
 | 8 | Author view with within-field prominence scoring | |
 | 9 | Sidebar upgrade — per-lens filters, venue filter, live counts | |
 | 10 | Zotero integration — replace mock data with real library | |
@@ -143,31 +143,31 @@ src/
 
 ### From Alsallakh et al. (2016) — Set Visualization STAR (CGF)
 
-Euler/region-based techniques break down beyond 6-8 sets due to clutter and drawability failure. This confirms the decision to use 5 Level 1 clusters rather than flat enumeration of 15+ disciplines.
+Euler/region-based techniques break down beyond 6-8 sets due to clutter and drawability failure. This confirms the decision to use 5 Level 1 clusters rather than flat enumeration of 15+ fields.
 
-Key techniques informing VisForge:
+Key techniques informing DecisionVerse:
 - **Bubble Sets** (Collins et al. 2009): isocontour-based regions via marching squares over an energy field. Handles overlapping membership naturally. Better than convex hulls for cross-cluster bridging subfields where publications belong to two clusters simultaneously.
 - **KelpFusion** (Meulemans et al. 2013): hybrid lines + filled regions. Reduces artefact overlaps that convex hulls produce. Useful for bridging subfield rendering.
 - Color recommendation: color alone is insufficient for >6 categories. Pair each cluster color with a secondary channel (opacity gradient, subtle texture, or stroke pattern) to maintain discriminability in dark mode and for colorblind users.
 
-Task taxonomy mapping (Alsallakh Section 3) to VisForge:
+Task taxonomy mapping (Alsallakh Section 3) to DecisionVerse:
 - B10 (compare set cardinalities) → dot density encoding within cluster regions
 - B11 (compare set similarities) → spatial proximity encoding between clusters
 - C2/C3 (attribute distributions within sets) → lens switching views
 
 ### From Nobre et al. (2019) — Multivariate Networks STAR (EuroVis)
 
-**Attribute-driven faceting** (Section 5.1.1.2): placing nodes in regions corresponding to a categorical attribute, with position within the region determined by force simulation. This is the correct framing for VisForge's Disciplines lens.
+**Attribute-driven faceting** (Section 5.1.1.2): placing nodes in regions corresponding to a categorical attribute, with position within the region determined by force simulation. This is the correct framing for DecisionVerse's Fields lens.
 
-Their Table 2 scoring recommends **integrated views** over juxtaposed views for VisForge's task profile (cluster-level tasks, heterogeneous node types, several attributes). The details panel should be spatially coupled to the selected node, not a separate panel.
+Their Table 2 scoring recommends **integrated views** over juxtaposed views for DecisionVerse's task profile (cluster-level tasks, heterogeneous node types, several attributes). The details panel should be spatially coupled to the selected node, not a separate panel.
 
-**Overloaded views** (Section 5.2.3): encoding set/cluster membership as hulls or isocontours overlaid on a force layout. This is the correct category for VisForge — not pure Euler diagram, not pure network, but a topology-driven layout with overloaded set membership encoding.
+**Overloaded views** (Section 5.2.3): encoding set/cluster membership as hulls or isocontours overlaid on a force layout. This is the correct category for DecisionVerse — not pure Euler diagram, not pure network, but a topology-driven layout with overloaded set membership encoding.
 
 ---
 
 ## Target Visual Design (the elegant solution)
 
-This is the design VisForge is building toward. Every implementation decision should serve this design.
+This is the design DecisionVerse is building toward. Every implementation decision should serve this design.
 
 ### Two-register spatial layout
 
@@ -201,7 +201,7 @@ Every visual element carries a specific intellectual claim. Cluster position = i
 - **Deep zoom:** full publication details inline, author names visible, venue badges
 
 ### Left panel controls
-- **View lens switcher:** Disciplines / Subfields / Domains / Authors — tabs not dropdown
+- **View lens switcher:** Fields / Subfields / Applications / Authors — tabs not dropdown
 - **Cluster filters:** opacity sliders (0–100%), not binary toggles
 - **Year range:** draggable visual timeline with density sparkline, not two text input boxes
 - **Author prominence threshold:** slider (show top N% within each field)

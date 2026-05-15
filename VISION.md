@@ -1,10 +1,10 @@
-# VisForge — Vision & Goals
+# DecisionVerse — Vision & Goals
 
 ## What This Project Is
 
-VisForge is a research visualization framework built with SvelteKit and D3.js.
+DecisionVerse is a research visualization framework built with SvelteKit and D3.js.
 
-The primary dataset is academic publications. The goal is to visualize the **intellectual landscape of decision making as a field** — across contributing disciplines, subfields, application domains, key authors, and time.
+The primary dataset is academic publications. The goal is to visualize the **intellectual landscape of decision making as a field** — across contributing fields, subfields, application contexts, key authors, and time.
 
 This is a research tool with two audiences:
 1. **Scholars** who want to understand where decision making knowledge comes from
@@ -16,9 +16,9 @@ The visualization starts as an Euler-inspired set diagram but is designed to evo
 
 ## Core Argument (the excavation thesis)
 
-Decision making is a field that does not yet know it is a field. Its knowledge is distributed, fragmented, and often not self-aware across disciplines that rarely cite each other. A paper in Management Science may contain profound decision making insight without the authors framing it that way. A paper in HCI may operationalize a decision construct without citing JDM literature at all.
+Decision making is a field that does not yet know it is a field. Its knowledge is distributed, fragmented, and often not self-aware across fields that rarely cite each other. A paper in Management Science may contain profound decision making insight without the authors framing it that way. A paper in HCI may operationalize a decision construct without citing JDM literature at all.
 
-VisForge is an excavation map — it surfaces where decision making knowledge currently hides, not where researchers self-identify as decision making scholars.
+DecisionVerse is an excavation map — it surfaces where decision making knowledge currently hides, not where researchers self-identify as decision making scholars.
 
 This means:
 - Peripheral clusters (Management Science, Political Science, HCI, Medicine) are as important as central ones
@@ -32,16 +32,16 @@ This means:
 
 Decision making knowledge has three distinct layers that must never be conflated:
 
-### Layer 1 — Disciplines that study decisions
+### Layer 1 — Fields that study decisions
 Fields with their own epistemology, methods, and publication culture.
 Examples: Psychology, Economics, Philosophy, Cognitive Science, Neuroscience, Statistics, Computer Science, HCI, Information Visualization, Artificial Intelligence, Operations Research, Management Science, Anthropology, Sociology, Political Science
 
 ### Layer 2 — Subfields focused specifically on decision making
-Subfields, paradigms, or applied fields that emerged from parent disciplines.
+Subfields, paradigms, or applied fields that emerged from parent fields.
 Examples: Behavioral Economics (← Psychology + Economics), Decision Theory (← Philosophy + Economics + Statistics), Game Theory (← Mathematics + Economics), MCDM (← Operations Research), Naturalistic Decision Making (← Cognitive Psychology), Decision Support Systems (← CS + Management Science), Recommender Systems (← AI), Judgment and Decision Making (← Psychology)
 
-### Layer 3 — Application domains where decisions happen
-Contexts where decision making is studied or supported — not disciplines.
+### Layer 3 — Application applications where decisions happen
+Contexts where decision making is studied or supported — not fields.
 Examples: Medical / Clinical, Organizational / Managerial, Energy / Sustainability, Legal / Policy, Financial, UI / Interactive Systems, Education, Crisis / Emergency Response
 
 These three layers are **orthogonal axes** on every publication.
@@ -55,9 +55,9 @@ The same publication dataset supports four switchable spatial organizations:
 
 | Lens | Spatial logic | What emerges |
 |---|---|---|
-| **Disciplines** | Regions = contributing fields | Where does DM knowledge come from? |
+| **Fields** | Regions = contributing fields | Where does DM knowledge come from? |
 | **Subfields** | Regions = DM-specific subfields | How is the DM field internally structured? |
-| **Domains** | Regions = application contexts | Where is DM knowledge applied? |
+| **Applications** | Regions = application contexts | Where is DM knowledge applied? |
 | **Authors** | Nodes = key authors, sized by within-field prominence | Who built this knowledge? |
 
 Switching lens = same publications, different spatial layout, different hulls.

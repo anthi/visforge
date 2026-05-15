@@ -1,7 +1,7 @@
 import type { TaxonomyEntry } from '$lib/models/taxonomy';
 
-// ── Layer 1: Disciplines ─────────────────────────────────────────────────────
-export const DISCIPLINES: TaxonomyEntry[] = [
+// ── Layer 1: Fields ─────────────────────────────────────────────────────
+export const FIELDS: TaxonomyEntry[] = [
 	{
 		id: 'psychology',
 		label: 'Psychology',
@@ -164,8 +164,8 @@ export const SUBFIELDS: TaxonomyEntry[] = [
 	}
 ];
 
-// ── Layer 3: Application Domains ──────────────────────────────────────────────
-export const DOMAINS: TaxonomyEntry[] = [
+// ── Layer 3: Application Contexts ──────────────────────────────────────────────
+export const APPLICATIONS: TaxonomyEntry[] = [
 	{
 		id: 'medical',
 		label: 'Medical / Clinical',
@@ -217,10 +217,10 @@ export const DOMAINS: TaxonomyEntry[] = [
 ];
 
 // ── Lookup maps ───────────────────────────────────────────────────────────────
-export const disciplinesById = new Map(DISCIPLINES.map((d) => [d.id, d]));
+export const fieldsById = new Map(FIELDS.map((d) => [d.id, d]));
 export const subfieldsById = new Map(SUBFIELDS.map((s) => [s.id, s]));
-export const domainsById = new Map(DOMAINS.map((d) => [d.id, d]));
+export const applicationsById = new Map(APPLICATIONS.map((d) => [d.id, d]));
 
 export function lookupTaxonomy(id: string): TaxonomyEntry | undefined {
-	return disciplinesById.get(id) ?? subfieldsById.get(id) ?? domainsById.get(id);
+	return fieldsById.get(id) ?? subfieldsById.get(id) ?? applicationsById.get(id);
 }
