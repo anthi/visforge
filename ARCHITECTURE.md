@@ -127,11 +127,11 @@ src/
 | 2 | Entity store + filter store | DONE |
 | 3 | Euler prototype — D3 force + convex hulls, static | DONE |
 | 4 | Euler interactions — hover, tooltip, selection, details panel | DONE |
-| 5 | Rebuild mock dataset: 3-axis ontology, 300 pubs, foundational papers | NEXT |
-| 6 | Update Publication model to fields/subfields/applications | |
-| 7 | Lens switching UI — fields / subfields / applications / authors | |
-| 8 | Author view with within-field prominence scoring | |
-| 9 | Sidebar upgrade — per-lens filters, venue filter, live counts | |
+| 5 | Rebuild mock dataset: 3-axis ontology, 300 pubs, foundational papers | PARTIAL — structure done, content needs real papers |
+| 6 | Update Publication model to fields/subfields/applications | DONE |
+| 7 | Lens switching UI — fields / subfields / applications / authors | DONE |
+| 8 | Author view with within-field prominence scoring | DONE — sqrt slot allocation, human glyph, stable layout |
+| 9 | Sidebar upgrade — per-lens filters, venue filter, live counts | DONE — exclusion-set venue filter, year range, prominence slider |
 | 10 | Zotero integration — replace mock data with real library | |
 | 11 | Network / citation view | |
 | 12 | Temporal view | |
