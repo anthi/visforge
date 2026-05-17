@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import * as d3 from 'd3';
-	import { filteredPublications, fields, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, allDerivedAuthors, visibleAuthors, searchQuery } from '$lib/stores';
+	import { filteredPublications, fields, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, allDerivedAuthors, visibleAuthors, searchQuery, clearSelection } from '$lib/stores';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 	import { fieldToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
@@ -256,6 +256,7 @@
 
 	function handleBackgroundClick() {
 		selectedAuthorId = null;
+		clearSelection();
 	}
 
 	// ─── Zoom ────────────────────────────────────────────────────────────────
@@ -419,6 +420,7 @@
 		{#if $currentLens !== 'authors'}
 			<!-- Layer 3: Publication dots -->
 			{#each nodes as node}
+				{@const _op = clusterOpacities}
 				{@const isHovered = node.id === $hoveredId}
 				{@const nc = nodeCluster(node)}
 				{@const dotOp = (() => {
@@ -487,15 +489,16 @@
 						return nc === $hoveredCategoryId ? 0.85 : 0.12;
 					return isHovered ? 0.95 : 0.62 * clusterOp(nc);
 				})()}
-				<!-- svelte-ignore a11y-interactive-supports-focus -->
 				<g
 					transform="translate({ax}, {ay})"
 					style="cursor:pointer"
 					role="button"
+					tabindex="0"
 					aria-label={node.author.name}
 					on:pointerenter={(e) => handleAuthorEnter(e, node, ax, ay)}
 					on:pointerleave={handleAuthorLeave}
 					on:click|stopPropagation={() => handleAuthorClick(node)}
+					on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAuthorClick(node); } }}
 				>
 					<!-- selection ring -->
 					{#if isSelected}

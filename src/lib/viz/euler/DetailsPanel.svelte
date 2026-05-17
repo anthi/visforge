@@ -26,7 +26,7 @@
 
 {#if pub}
 	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-	<div class="backdrop" on:click={dismiss}></div>
+	<div class="backdrop" style="pointer-events: none" on:click={dismiss}></div>
 	<aside class="panel" style="left:{px}px;top:{py}px;width:{PANEL_W}px">
 		<button class="close" on:click={clearSelection} aria-label="Close">×</button>
 
@@ -102,6 +102,7 @@
 		position: absolute;
 		inset: 0;
 		z-index: 19;
+		pointer-events: none;
 	}
 
 	.panel {

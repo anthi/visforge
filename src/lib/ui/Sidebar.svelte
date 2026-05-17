@@ -137,15 +137,16 @@
 	<!-- Year timeline sparkline -->
 	<section>
 		<p class="section-label">Years · {$yearRange.min}–{$yearRange.max}</p>
-		<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 		<svg
 			class="timeline"
 			viewBox="0 0 {CHART_W} {CHART_H}"
 			preserveAspectRatio="none"
 			role="slider"
+			tabindex="0"
 			aria-label="Year range"
 			aria-valuemin={$yearBounds.min}
 			aria-valuemax={$yearBounds.max}
+			aria-valuenow={$yearRange.min}
 			on:pointerdown={onTimelineDown}
 			on:pointermove={onTimelineMove}
 			on:pointerup={onTimelineUp}
@@ -217,6 +218,7 @@
 
 <style>
 	.sidebar {
+		box-sizing: border-box;
 		width: 220px;
 		flex-shrink: 0;
 		display: flex;
