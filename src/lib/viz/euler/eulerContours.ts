@@ -11,6 +11,8 @@ export type RegionContour = {
 	path: string;
 	labelPos: [number, number];
 	color: string;
+	/** True for application_domain cluster — rendered with dashed stroke and lower opacity. */
+	isApplicationDomain?: boolean;
 	/** Raw GeoJSON MultiPolygon coordinates — used for disc label polygon clipping. */
 	coordinates: number[][][][];
 };
@@ -231,6 +233,7 @@ export function computeClusterContours(
 				path: result.path,
 				labelPos,
 				color: cluster.color,
+				isApplicationDomain: cluster.id === 'application_domain',
 				coordinates: result.coordinates,
 			}
 		];
@@ -252,31 +255,29 @@ const BRIDGE_DEFS: {
 		id: 'behavioral_economics',
 		label: 'Behavioral Economics',
 		parentClusters: ['mind', 'formal'],
-		filter: (p) => p.subfields.includes('behavioral_economics')
-	},
-	{
-		id: 'neuroeconomics',
-		label: 'Neuroeconomics',
-		parentClusters: ['mind', 'formal'],
-		filter: (p) => p.subfields.includes('neuroeconomics')
+		// behavioral_economics is now a Layer 1 field (moved from subfields)
+		filter: (p) => p.fields.includes('behavioral_economics')
 	},
 	{
 		id: 'ndm',
 		label: 'Naturalistic DM',
 		parentClusters: ['mind', 'societal'],
-		filter: (p) => p.subfields.includes('naturalistic_decision_making')
+		// naturalistic_decision_making is now a Layer 1 field
+		filter: (p) => p.fields.includes('naturalistic_decision_making')
 	},
 	{
 		id: 'mcdm',
 		label: 'MCDM',
 		parentClusters: ['formal', 'societal'],
-		filter: (p) => p.subfields.includes('multi_criteria_decision_making')
+		// multi_criteria_decision_making is now a Layer 1 field
+		filter: (p) => p.fields.includes('multi_criteria_decision_making')
 	},
 	{
 		id: 'dss',
 		label: 'Decision Support',
 		parentClusters: ['formal', 'design'],
-		filter: (p) => p.subfields.includes('decision_support_systems')
+		// decision_support_systems is now a Layer 1 field
+		filter: (p) => p.fields.includes('decision_support_systems')
 	},
 	{
 		id: 'xai',
@@ -285,7 +286,7 @@ const BRIDGE_DEFS: {
 		filter: (p) => {
 			const d = p.fields;
 			const inFormal = d.some((x) =>
-				['artificial_intelligence', 'computer_science', 'statistics', 'mathematics',
+				['artificial_intelligence', 'computer_science', 'statistics',
 				 'economics', 'operations_research'].includes(x)
 			);
 			const inDesign = d.some((x) => ['information_visualization', 'hci'].includes(x));

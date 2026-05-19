@@ -4,7 +4,8 @@
 	import { filteredPublications, fields, hoveredId, hoveredPublication, setHovered, hoveredCategoryId, setHoveredCategory, clusterCounts, selectedIds, selectSingle, selectedPublications, currentLens, allDerivedAuthors, visibleAuthors, searchQuery, clearSelection } from '$lib/stores';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
-	import { fieldToCluster, getDotColor, CLUSTER_COLORS } from '$lib/data/clusters';
+	import { fieldToCluster, getDotColor, CLUSTER_COLORS, CLASSIFICATION2_COLORS } from '$lib/data/clusters';
+	import { lookupTaxonomy } from '$lib/data/taxonomy';
 	import Tooltip from '$lib/ui/Tooltip.svelte';
 	import DetailsPanel from './DetailsPanel.svelte';
 
@@ -180,6 +181,18 @@
 
 	function clusterOp(id: string): number {
 		return clusterOpacities[id] ?? 1;
+	}
+
+	/** Returns the DO/SHOULD/COULD stroke color for a node's primary field. */
+	function nodeC2Color(node: EulerNode): string {
+		const entry = lookupTaxonomy(node.publication.fields[0] ?? '');
+		return CLASSIFICATION2_COLORS[entry?.classification_2 ?? 'not_applicable'];
+	}
+
+	/** True when the node's primary field is an application_domain. */
+	function isApplicationDomain(node: EulerNode): boolean {
+		const entry = lookupTaxonomy(node.publication.fields[0] ?? '');
+		return entry?.simplified_type === 'application_domain';
 	}
 
 	// Map disc label id → cluster id (for opacity lookup)
@@ -389,13 +402,15 @@
 		{#each clusterContours as region}
 			{@const op = clusterOp(region.id)}
 			{@const isHoveredCluster = $hoveredCategoryId === region.id}
+			{@const isADCluster = region.isApplicationDomain}
 			<path
 				d={region.path}
 				fill={region.color}
-				fill-opacity={isHoveredCluster ? 0.18 * op : 0.10 * op}
+				fill-opacity={isHoveredCluster ? (isADCluster ? 0.10 : 0.18) * op : (isADCluster ? 0.05 : 0.10) * op}
 				stroke={region.color}
-				stroke-width={isHoveredCluster ? 2.5 : 2.0}
-				stroke-opacity={isHoveredCluster ? 0.75 * op : 0.50 * op}
+				stroke-width={isHoveredCluster ? 2.0 : 1.4}
+				stroke-opacity={isHoveredCluster ? 0.65 * op : (isADCluster ? 0.35 : 0.50) * op}
+				stroke-dasharray={isADCluster ? '6 4' : undefined}
 				stroke-linejoin="round"
 				style="cursor:default"
 				on:pointerenter={() => handleClusterEnter(region)}
@@ -423,6 +438,7 @@
 				{@const _op = clusterOpacities}
 				{@const isHovered = node.id === $hoveredId}
 				{@const nc = nodeCluster(node)}
+				{@const isAD = isApplicationDomain(node)}
 				{@const dotOp = (() => {
 					if ($hoveredId !== null) {
 						return node.publication.fields[0] !== hoveredField ? 0.08 : 0.85;
@@ -430,16 +446,29 @@
 					if ($hoveredCategoryId !== null) {
 						return nc === $hoveredCategoryId ? 0.75 : 0.10;
 					}
-					return 0.40 * clusterOp(nc);
+					return (isAD ? 0.28 : 0.40) * clusterOp(nc);
 				})()}
 				{@const ap = $animatedPositions[node.id]}
 				{@const ax = ap ? ap[0] : node.x}
 				{@const ay = ap ? ap[1] : node.y}
 				{@const baseR = zoomScale > 3 ? 10 : zoomScale > 1.5 ? 8 : 4}
+				{@const r = isHovered ? baseR + 2 : baseR}
+				<!-- Application domains: dashed outer ring. Other dots: thin classification_2 color ring when zoomed. -->
+				{#if isAD}
+					<circle cx={ax} cy={ay} r={r + 1.5} fill="none"
+						stroke={nodeColor(node)} stroke-width={1}
+						stroke-opacity={dotOp * 1.6} stroke-dasharray="2 2"
+						pointer-events="none" />
+				{:else if zoomScale > 1.0}
+					<circle cx={ax} cy={ay} r={r + 1.5} fill="none"
+						stroke={nodeC2Color(node)} stroke-width={0.8}
+						stroke-opacity={dotOp * 1.4}
+						pointer-events="none" />
+				{/if}
 				<circle
 					cx={ax}
 					cy={ay}
-					r={isHovered ? baseR + 2 : baseR}
+					r={r}
 					fill={nodeColor(node)}
 					fill-opacity={dotOp}
 					style="cursor:pointer"
