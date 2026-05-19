@@ -276,8 +276,16 @@
 	let svgEl: SVGSVGElement;
 	let zoomTransform = 'translate(0,0) scale(1)';
 	let zoomScale = 1;
+	let panX = 0;
+	let panY = 0;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let zoomBehavior: any = null;
+
+	/** Viewport bounds in SVG (pre-transform) coordinates. Used for label culling. */
+	$: vpMinX = -panX / zoomScale;
+	$: vpMinY = -panY / zoomScale;
+	$: vpMaxX = vpMinX + width / zoomScale;
+	$: vpMaxY = vpMinY + height / zoomScale;
 
 	function handleDotEnter(e: PointerEvent, node: EulerNode) {
 		setHovered(node.id);
@@ -349,6 +357,8 @@
 					const t = event.transform;
 					zoomTransform = `translate(${t.x},${t.y}) scale(${t.k})`;
 					zoomScale = t.k;
+					panX = t.x;
+					panY = t.y;
 				});
 			d3.select(svgEl).call(zoomBehavior);
 		}
@@ -453,6 +463,7 @@
 				{@const ay = ap ? ap[1] : node.y}
 				{@const baseR = zoomScale > 3 ? 10 : zoomScale > 1.5 ? 8 : 4}
 				{@const r = isHovered ? baseR + 2 : baseR}
+				{@const inView = ax > vpMinX - 60 && ax < vpMaxX + 60 && ay > vpMinY - 60 && ay < vpMaxY + 60}
 				<!-- Application domains: dashed outer ring. Other dots: thin classification_2 color ring when zoomed. -->
 				{#if isAD}
 					<circle cx={ax} cy={ay} r={r + 1.5} fill="none"
@@ -476,7 +487,7 @@
 					on:pointerleave={handleDotLeave}
 					on:click|stopPropagation={() => handleDotClick({ ...node, x: ax, y: ay })}
 				/>
-				{#if zoomScale > 1.5}
+				{#if inView && zoomScale > 2.5}
 					<text
 						x={ax + baseR + 3}
 						y={ay - baseR - 2}
@@ -487,7 +498,7 @@
 						pointer-events="none"
 					>{(node.publication.fields[0] ?? '').replace(/_/g, ' ')}</text>
 				{/if}
-				{#if zoomScale > 3}
+				{#if inView && zoomScale > 4}
 					<text
 						x={ax + baseR + 3}
 						y={ay + 4}
@@ -557,24 +568,27 @@
 			{/each}
 		{/if}
 
-		<!-- Cluster labels -->
-		{#each clusterContours as region}
-			<text
-				x={region.labelPos[0]}
-				y={region.labelPos[1]}
-				text-anchor="middle"
-				dominant-baseline="middle"
-				fill={region.color}
-				font-size={13}
-				font-weight={600}
-				font-family="'JetBrains Mono', 'Fira Mono', monospace"
-				letter-spacing="0.04em"
-				opacity={0.88 * clusterOp(region.id)}
-				pointer-events="none"
-			>
-				{region.label}
-			</text>
-		{/each}
+		<!-- Cluster labels — fade out as user zooms in -->
+		{#if zoomScale < 3}
+			{@const clLabelFade = zoomScale > 2 ? 1 - (zoomScale - 2) / 1 : 1}
+			{#each clusterContours as region}
+				<text
+					x={region.labelPos[0]}
+					y={region.labelPos[1]}
+					text-anchor="middle"
+					dominant-baseline="middle"
+					fill={region.color}
+					font-size={13}
+					font-weight={600}
+					font-family="'JetBrains Mono', 'Fira Mono', monospace"
+					letter-spacing="0.04em"
+					opacity={0.88 * clusterOp(region.id) * clLabelFade}
+					pointer-events="none"
+				>
+					{region.label}
+				</text>
+			{/each}
+		{/if}
 
 		<!-- Cluster count badge (shown on cluster hover) -->
 		{#if clusterBadgePos}
@@ -591,50 +605,53 @@
 			>{clusterBadgePos.label}</text>
 		{/if}
 
-		<!-- Bridge labels -->
-		{#each bridgeContours as band}
-			<text
-				x={band.labelPos[0]}
-				y={band.labelPos[1]}
-				text-anchor="middle"
-				dominant-baseline="middle"
-				fill={band.color}
-				font-size={9}
-				font-weight={500}
-				font-family="'JetBrains Mono', 'Fira Mono', monospace"
-				letter-spacing="0.03em"
-				opacity={0.72}
-				pointer-events="none"
-			>
-				{band.label}
-			</text>
-		{/each}
+		<!-- Bridge labels — hide when zoomed in -->
+		{#if zoomScale < 3}
+			{#each bridgeContours as band}
+				<text
+					x={band.labelPos[0]}
+					y={band.labelPos[1]}
+					text-anchor="middle"
+					dominant-baseline="middle"
+					fill={band.color}
+					font-size={9}
+					font-weight={500}
+					font-family="'JetBrains Mono', 'Fira Mono', monospace"
+					letter-spacing="0.03em"
+					opacity={0.72}
+					pointer-events="none"
+				>{band.label}</text>
+			{/each}
+		{/if}
 
-		<!-- Field sub-labels -->
-		{#each fieldLabels as dl}
-			{@const flOp = clusterOp(fieldLabelCluster(dl.id))}
-			<text
-				x={dl.x}
-				y={dl.y}
-				text-anchor="middle"
-				dominant-baseline="middle"
-				fill={dl.color}
-				font-size={9}
-				font-weight={400}
-				font-family="'JetBrains Mono', 'Fira Mono', monospace"
-				letter-spacing="0.02em"
-				fill-opacity={0.60 * flOp}
-				pointer-events="none"
-			>
-				{#if dl.label.length > 12}
-					{@const [l1, l2] = splitLabel(dl.label)}
-					<tspan x={dl.x} dy="-6.5">{l1}</tspan>
-					<tspan x={dl.x} dy="13">{l2}</tspan>
-				{:else}
-					{dl.label}
-				{/if}
-			</text>
-		{/each}
+		<!-- Field sub-labels — hidden when zoomed in (dot-level labels take over) -->
+		{#if zoomScale < 2.2}
+			{#each fieldLabels as dl}
+				{@const flOp = clusterOp(fieldLabelCluster(dl.id))}
+				{@const fadeOp = zoomScale > 1.6 ? 1 - (zoomScale - 1.6) / 0.6 : 1}
+				<text
+					x={dl.x}
+					y={dl.y}
+					text-anchor="middle"
+					dominant-baseline="middle"
+					fill={dl.color}
+					font-size={9}
+					font-weight={400}
+					font-family="'JetBrains Mono', 'Fira Mono', monospace"
+					letter-spacing="0.02em"
+					fill-opacity={0.60 * flOp * fadeOp}
+					pointer-events="none"
+				>
+					{#if dl.label.length > 12}
+						{@const [l1, l2] = splitLabel(dl.label)}
+						<tspan x={dl.x} dy="-6.5">{l1}</tspan>
+						<tspan x={dl.x} dy="13">{l2}</tspan>
+					{:else}
+						{dl.label}
+					{/if}
+				</text>
+			{/each}
+		{/if}
 
 		</g>
 	</svg>
