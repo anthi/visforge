@@ -1,11 +1,13 @@
 import type { TaxonomyEntry } from '$lib/models/taxonomy';
 
-// ── Layer 1: Fields — generate transferable DM knowledge ────────────────────
-// simplified_type distinguishes pure disciplines ("field") from DM-specific
-// subfields now elevated to first-class status ("subfield"), and application
-// contexts that import rather than generate DM theory ("application_domain").
+// Source of truth: DecisionVerse Conceptual Map spreadsheet
+// Simplified Type values match the "Simplified Type" column exactly.
+// Classification 2 values match the "Classification 2" column.
+
+// ── Layer 1: Fields ────────────────────────────────────────────────────────────
+
 export const FIELDS: TaxonomyEntry[] = [
-	// ── Core sciences — DO (descriptive) ───────────────────────────────────
+	// ── Mind & Behavior — DO ───────────────────────────────────────────────
 	{
 		id: 'psychology',
 		label: 'Psychology',
@@ -28,39 +30,23 @@ export const FIELDS: TaxonomyEntry[] = [
 		layer: 1,
 		simplified_type: 'field',
 		classification_2: 'DO',
-		description: 'Scientific study of the nervous system and brain; encompasses neuroeconomics (Glimcher & Fehr)'
+		description: 'Scientific study of the nervous system and brain; encompasses neuroeconomics'
 	},
 	{
-		id: 'anthropology',
-		label: 'Anthropology',
+		id: 'behavioral_economics',
+		label: 'Behavioral Economics',
 		layer: 1,
 		simplified_type: 'field',
 		classification_2: 'DO',
-		description: 'Study of human societies, cultures, and their development'
+		description: 'Integration of psychological insights into economic models'
 	},
 	{
-		id: 'sociology',
-		label: 'Sociology',
+		id: 'naturalistic_decision_making',
+		label: 'Naturalistic Decision Making',
 		layer: 1,
-		simplified_type: 'field',
+		simplified_type: 'subfield',
 		classification_2: 'DO',
-		description: 'Study of social behavior, institutions, and structures'
-	},
-	{
-		id: 'political_science',
-		label: 'Political Science',
-		layer: 1,
-		simplified_type: 'field',
-		classification_2: 'DO',
-		description: 'Study of political systems, behavior, and institutions'
-	},
-	{
-		id: 'management_science',
-		label: 'Management Science',
-		layer: 1,
-		simplified_type: 'field',
-		classification_2: 'DO',
-		description: 'Scientific methods for managerial decisions; covers decision analysis, forecasting, groupthink (Janis 1972), escalation of commitment (Staw 1976), sensemaking (Weick 1995), garbage can model (Cohen, March & Olsen 1972)'
+		description: 'Study of expert decision making in real-world operational settings'
 	},
 	{
 		id: 'marketing',
@@ -70,24 +56,9 @@ export const FIELDS: TaxonomyEntry[] = [
 		classification_2: 'DO',
 		description: 'Study of how consumers choose and how choices are influenced'
 	},
-	// ── DM-specific subfields elevated to fields — DO ──────────────────────
-	{
-		id: 'behavioral_economics',
-		label: 'Behavioral Economics',
-		layer: 1,
-		simplified_type: 'subfield',
-		classification_2: 'DO',
-		description: 'Integration of psychological insights into economic models; bridges Mind & Behavior ↔ Formal & Computational'
-	},
-	{
-		id: 'naturalistic_decision_making',
-		label: 'Naturalistic Decision Making',
-		layer: 1,
-		simplified_type: 'subfield',
-		classification_2: 'DO',
-		description: 'Study of decision making in complex, real-world environments; bridges Mind & Behavior ↔ Collective & Societal'
-	},
-	// ── Core sciences — SHOULD (normative) ─────────────────────────────────
+
+	// ── Formal & Mathematical — SHOULD ────────────────────────────────────
+	// Philosophy is included here (absorbed from standalone cluster)
 	{
 		id: 'economics',
 		label: 'Economics',
@@ -102,7 +73,7 @@ export const FIELDS: TaxonomyEntry[] = [
 		layer: 1,
 		simplified_type: 'field',
 		classification_2: 'SHOULD',
-		description: 'Normative and epistemological foundations of rational choice'
+		description: 'Normative and epistemological foundations of rational choice and agency'
 	},
 	{
 		id: 'statistics',
@@ -113,31 +84,41 @@ export const FIELDS: TaxonomyEntry[] = [
 		description: 'Mathematical study of uncertainty, inference, and evidence'
 	},
 	{
-		id: 'operations_research',
-		label: 'Operations Research',
-		layer: 1,
-		simplified_type: 'field',
-		classification_2: 'SHOULD',
-		description: 'Mathematical optimization methods for complex decision problems'
-	},
-	// ── DM-specific subfields elevated to fields — SHOULD ──────────────────
-	{
 		id: 'decision_theory',
 		label: 'Decision Theory',
 		layer: 1,
 		simplified_type: 'subfield',
 		classification_2: 'SHOULD',
-		description: 'Formal study of rational choice under uncertainty'
+		description: 'Formal mathematical study of rational choice under risk and uncertainty'
 	},
 	{
 		id: 'game_theory',
 		label: 'Game Theory',
 		layer: 1,
-		simplified_type: 'subfield',
+		simplified_type: 'field',
 		classification_2: 'SHOULD',
 		description: 'Mathematical study of strategic interaction between agents'
 	},
-	// ── Core sciences — COULD (prescriptive/supportive) ────────────────────
+	{
+		id: 'multi_criteria_decision_making',
+		label: 'Multi-Criteria Decision Making',
+		layer: 1,
+		simplified_type: 'subfield',
+		classification_2: 'COULD',
+		description: 'Methods for decisions involving multiple conflicting objectives'
+	},
+
+	// ── Formal & Mathematical — COULD (prescriptive math) ─────────────────
+	{
+		id: 'operations_research',
+		label: 'Operations Research',
+		layer: 1,
+		simplified_type: 'field',
+		classification_2: 'COULD',
+		description: 'Mathematical optimization methods for complex decision problems'
+	},
+
+	// ── Computational & Systems — COULD ───────────────────────────────────
 	{
 		id: 'computer_science',
 		label: 'Computer Science',
@@ -155,37 +136,12 @@ export const FIELDS: TaxonomyEntry[] = [
 		description: 'Design of systems that exhibit intelligent behavior'
 	},
 	{
-		id: 'information_visualization',
-		label: 'Information Visualization',
-		layer: 1,
-		simplified_type: 'field',
-		classification_2: 'COULD',
-		description: 'Visual representation of abstract data to amplify cognition and support decisions'
-	},
-	{
-		id: 'hci',
-		label: 'Human-Computer Interaction',
-		layer: 1,
-		simplified_type: 'field',
-		classification_2: 'COULD',
-		description: 'Design and evaluation of interactive computing systems'
-	},
-	// ── DM-specific subfields elevated to fields — COULD ───────────────────
-	{
-		id: 'multi_criteria_decision_making',
-		label: 'Multi-Criteria Decision Making',
-		layer: 1,
-		simplified_type: 'subfield',
-		classification_2: 'COULD',
-		description: 'Methods for decisions involving multiple conflicting objectives; bridges Formal ↔ Collective'
-	},
-	{
 		id: 'decision_support_systems',
 		label: 'Decision Support Systems',
 		layer: 1,
 		simplified_type: 'subfield',
 		classification_2: 'COULD',
-		description: 'Information systems that support managerial decision making; bridges Formal ↔ Design'
+		description: 'Interactive information systems that support organizational decision making'
 	},
 	{
 		id: 'recommender_systems',
@@ -201,10 +157,62 @@ export const FIELDS: TaxonomyEntry[] = [
 		layer: 1,
 		simplified_type: 'subfield',
 		classification_2: 'COULD',
-		description: 'Using data analysis to guide organizational decisions'
+		description: 'Using data analysis to ground organizational and operational decisions'
 	},
-	// ── Application Domains — consume DM theory, do not generate it ─────────
-	// Visual treatment: dashed outline, lower opacity fill, softer boundary.
+
+	// ── Design & Artifact — COULD ─────────────────────────────────────────
+	{
+		id: 'information_visualization',
+		label: 'Information Visualization',
+		layer: 1,
+		simplified_type: 'field',
+		classification_2: 'COULD',
+		description: 'Visual representation of abstract data to amplify cognition and support decisions'
+	},
+	{
+		id: 'hci',
+		label: 'Human-Computer Interaction',
+		layer: 1,
+		simplified_type: 'field',
+		classification_2: 'COULD',
+		description: 'Design and evaluation of interactive computing systems'
+	},
+
+	// ── Socio-Institutional — DO ──────────────────────────────────────────
+	{
+		id: 'management_science',
+		label: 'Management Science',
+		layer: 1,
+		simplified_type: 'field',
+		classification_2: 'DO',
+		description: 'Scientific methods for managerial and organizational decisions'
+	},
+	{
+		id: 'sociology',
+		label: 'Sociology',
+		layer: 1,
+		simplified_type: 'field',
+		classification_2: 'DO',
+		description: 'Study of social behavior, institutions, and structures'
+	},
+	{
+		id: 'anthropology',
+		label: 'Anthropology',
+		layer: 1,
+		simplified_type: 'field',
+		classification_2: 'DO',
+		description: 'Study of human societies, cultures, and their development'
+	},
+	{
+		id: 'political_science',
+		label: 'Political Science',
+		layer: 1,
+		simplified_type: 'field',
+		classification_2: 'DO',
+		description: 'Study of political systems, behavior, and institutions'
+	},
+
+	// ── Application Domains — consume DM theory, do not generate it ────────
 	{
 		id: 'medicine_clinical',
 		label: 'Medicine / Clinical',
@@ -255,9 +263,7 @@ export const FIELDS: TaxonomyEntry[] = [
 	},
 ];
 
-// ── Layer 2: Subfields — DM-specific lenses (for Subfields lens) ────────────
-// These are pure DM subfields used for the Subfields lens spatial layout.
-// behavioral_economics, decision_theory etc. have moved to Layer 1 above.
+// ── Layer 2: Subfields — DM-specific lens (for Subfields lens) ────────────────
 export const SUBFIELDS: TaxonomyEntry[] = [
 	{
 		id: 'judgment_and_decision_making',
@@ -269,7 +275,7 @@ export const SUBFIELDS: TaxonomyEntry[] = [
 	},
 ];
 
-// ── Layer 3: Application Contexts — where decisions happen (for Applications lens) ─
+// ── Layer 3: Application Contexts — where decisions happen ───────────────────
 export const APPLICATIONS: TaxonomyEntry[] = [
 	{
 		id: 'medical',

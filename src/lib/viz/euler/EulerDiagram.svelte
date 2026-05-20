@@ -51,20 +51,26 @@
 	});
 
 	// ─── Field sub-label specs ───────────────────────────────────────────
+	// One label per cluster region — anchored to the centroid of matching nodes.
 	const FIELD_SPECS: { id: string; label: string; layer: 'field' | 'subfield' }[] = [
-		{ id: 'information_visualization', label: 'Information Visualization', layer: 'field' },
-		{ id: 'hci',                        label: 'HCI',                        layer: 'field' },
-		{ id: 'psychology',                 label: 'Psychology',                 layer: 'field' },
-		{ id: 'economics',                  label: 'Economics',                  layer: 'field' },
-		{ id: 'statistics',                 label: 'Statistics',                 layer: 'field' },
-		{ id: 'decision_theory',            label: 'Decision Theory',            layer: 'subfield'   },
-		{ id: 'management_science',         label: 'Management Science',         layer: 'field' },
-		{ id: 'neuroscience',               label: 'Neuroscience',               layer: 'field' },
-		{ id: 'cognitive_science',          label: 'Cognitive Science',          layer: 'field' },
-		{ id: 'philosophy',                 label: 'Philosophy',                 layer: 'field' },
-		{ id: 'operations_research',        label: 'Operations Research',        layer: 'field' },
-		{ id: 'artificial_intelligence',    label: 'AI',                         layer: 'field' },
-		{ id: 'sociology',                  label: 'Sociology',                  layer: 'field' },
+		// Mind & Behavior
+		{ id: 'psychology',                 label: 'Psychology',          layer: 'field' },
+		{ id: 'neuroscience',               label: 'Neuroscience',        layer: 'field' },
+		{ id: 'cognitive_science',          label: 'Cognitive Science',   layer: 'field' },
+		// Formal & Mathematical
+		{ id: 'economics',                  label: 'Economics',           layer: 'field' },
+		{ id: 'statistics',                 label: 'Statistics',          layer: 'field' },
+		{ id: 'philosophy',                 label: 'Philosophy',          layer: 'field' },
+		{ id: 'operations_research',        label: 'Operations Research', layer: 'field' },
+		// Computational & Systems
+		{ id: 'artificial_intelligence',    label: 'AI',                  layer: 'field' },
+		{ id: 'computer_science',           label: 'Computer Science',    layer: 'field' },
+		// Design & Artifact
+		{ id: 'information_visualization',  label: 'InfoVis',             layer: 'field' },
+		{ id: 'hci',                        label: 'HCI',                 layer: 'field' },
+		// Socio-Institutional
+		{ id: 'management_science',         label: 'Management Science',  layer: 'field' },
+		{ id: 'sociology',                  label: 'Sociology',           layer: 'field' },
 	];
 
 	function buildRawFieldLabels(ns: EulerNode[]): RawFieldLabel[] {

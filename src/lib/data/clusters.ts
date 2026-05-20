@@ -9,9 +9,9 @@ export type ClusterEntry = {
 };
 
 // ─── Single source of truth: field → cluster ─────────────────────────────────
-// Adding a field requires exactly one new entry here.
+// Source of truth: DecisionVerse Conceptual Map spreadsheet (Classification 1 column)
 export const CLUSTER_MAP: Record<string, string> = {
-	// Mind & Behavior — DO fields (descriptive, how humans actually decide)
+	// Mind & Behavior — DO fields (how people actually decide)
 	psychology:                    'mind',
 	cognitive_science:             'mind',
 	neuroscience:                  'mind',
@@ -19,31 +19,33 @@ export const CLUSTER_MAP: Record<string, string> = {
 	naturalistic_decision_making:  'mind',
 	marketing:                     'mind',
 
-	// Formal & Computational — SHOULD + COULD fields
+	// Formal & Mathematical — SHOULD fields (normative/rational choice)
+	// Philosophy absorbed here (no longer a standalone cluster)
 	economics:                     'formal',
 	statistics:                    'formal',
 	operations_research:           'formal',
 	decision_theory:               'formal',
 	game_theory:                   'formal',
-	artificial_intelligence:       'formal',
-	computer_science:              'formal',
 	multi_criteria_decision_making:'formal',
-	decision_support_systems:      'formal',
-	recommender_systems:           'formal',
-	data_driven_decision_making:   'formal',
+	philosophy:                    'formal',
 
-	// Design & Interaction — COULD fields
+	// Computational & Systems — COULD fields (CS-derived, algorithmic)
+	// Split out from Formal: CS, AI, DSS, Recommender Systems, DDDM
+	computer_science:              'computational',
+	artificial_intelligence:       'computational',
+	decision_support_systems:      'computational',
+	recommender_systems:           'computational',
+	data_driven_decision_making:   'computational',
+
+	// Design & Artifact — COULD fields (design-centred human-facing systems)
 	information_visualization:     'design',
 	hci:                           'design',
 
-	// Collective & Societal — DO fields
+	// Socio-Institutional — DO fields (collective/institutional contexts)
 	management_science:            'societal',
 	sociology:                     'societal',
 	anthropology:                  'societal',
 	political_science:             'societal',
-
-	// Philosophy — SHOULD field
-	philosophy:                    'philosophy',
 
 	// Application Domains — consume DM theory, visually distinct
 	medicine_clinical:             'application_domain',
@@ -56,12 +58,12 @@ export const CLUSTER_MAP: Record<string, string> = {
 
 // ─── Cluster colors ────────────────────────────────────────────────────────────
 export const CLUSTER_COLORS: Record<string, string> = {
-	mind:               '#c0392b',
-	formal:             '#2980b9',
-	design:             '#e67e22',
-	societal:           '#27ae60',
-	philosophy:         '#8e44ad',
-	application_domain: '#64748b',  // muted slate — visually distinct from knowledge-generating fields
+	mind:               '#c0392b',  // red
+	formal:             '#2980b9',  // blue
+	computational:      '#8e44ad',  // purple (formerly philosophy)
+	design:             '#e67e22',  // orange
+	societal:           '#27ae60',  // green
+	application_domain: '#64748b',  // muted slate
 };
 
 // ─── DO/SHOULD/COULD stroke colors (classification_2 axis) ───────────────────
@@ -88,24 +90,24 @@ const CLUSTER_META: Record<string, Omit<ClusterEntry, 'id' | 'fields'>> = {
 		description: 'Cognitive, behavioral, and neural foundations of decision making'
 	},
 	formal: {
-		label: 'Formal & Computational',
+		label: 'Formal & Mathematical',
 		color: CLUSTER_COLORS.formal,
-		description: 'Formal, mathematical, and computational approaches to rational choice'
+		description: 'Normative and mathematical frameworks for rational choice, including philosophy'
+	},
+	computational: {
+		label: 'Computational & Systems',
+		color: CLUSTER_COLORS.computational,
+		description: 'CS-derived fields that formalize, automate, and support decisions through computation'
 	},
 	design: {
-		label: 'Design & Interaction',
+		label: 'Design & Artifact',
 		color: CLUSTER_COLORS.design,
-		description: 'Fields that operationalize and support decision making through design'
+		description: 'Fields that operationalize decision support through interactive artifact design'
 	},
 	societal: {
-		label: 'Collective & Societal',
+		label: 'Socio-Institutional',
 		color: CLUSTER_COLORS.societal,
-		description: 'Decisions in social, organizational, and political contexts'
-	},
-	philosophy: {
-		label: 'Philosophy',
-		color: CLUSTER_COLORS.philosophy,
-		description: 'Normative and epistemological foundations of rational choice'
+		description: 'Decisions in social, organizational, and institutional contexts'
 	},
 	application_domain: {
 		label: 'Application Domains',

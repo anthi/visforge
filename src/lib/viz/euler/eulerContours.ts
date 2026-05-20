@@ -255,42 +255,41 @@ const BRIDGE_DEFS: {
 		id: 'behavioral_economics',
 		label: 'Behavioral Economics',
 		parentClusters: ['mind', 'formal'],
-		// behavioral_economics is now a Layer 1 field (moved from subfields)
 		filter: (p) => p.fields.includes('behavioral_economics')
 	},
 	{
 		id: 'ndm',
 		label: 'Naturalistic DM',
 		parentClusters: ['mind', 'societal'],
-		// naturalistic_decision_making is now a Layer 1 field
 		filter: (p) => p.fields.includes('naturalistic_decision_making')
 	},
 	{
 		id: 'mcdm',
 		label: 'MCDM',
 		parentClusters: ['formal', 'societal'],
-		// multi_criteria_decision_making is now a Layer 1 field
 		filter: (p) => p.fields.includes('multi_criteria_decision_making')
 	},
 	{
+		// DSS bridges Computational & Systems ↔ Design & Artifact
 		id: 'dss',
 		label: 'Decision Support',
-		parentClusters: ['formal', 'design'],
-		// decision_support_systems is now a Layer 1 field
+		parentClusters: ['computational', 'design'],
 		filter: (p) => p.fields.includes('decision_support_systems')
 	},
 	{
+		// XAI bridges Computational & Systems ↔ Design & Artifact
+		// (AI/CS are now in computational, InfoVis/HCI in design)
 		id: 'xai',
 		label: 'XAI / Explainability',
-		parentClusters: ['formal', 'design'],
+		parentClusters: ['computational', 'design'],
 		filter: (p) => {
 			const d = p.fields;
-			const inFormal = d.some((x) =>
-				['artificial_intelligence', 'computer_science', 'statistics',
-				 'economics', 'operations_research'].includes(x)
+			const inComputational = d.some((x) =>
+				['artificial_intelligence', 'computer_science',
+				 'decision_support_systems', 'recommender_systems'].includes(x)
 			);
 			const inDesign = d.some((x) => ['information_visualization', 'hci'].includes(x));
-			return inFormal && inDesign;
+			return inComputational && inDesign;
 		}
 	}
 ];
